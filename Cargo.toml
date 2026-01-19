@@ -1,0 +1,3 @@
+[workspace]
+members = ["grab", "echo-service"]
+resolver = "2"

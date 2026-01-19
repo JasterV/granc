@@ -1,0 +1,51 @@
+[config]
+# Sets the default task to run when executing `cargo make` without arguments
+default_to_workspace = false
+skip_core_tasks = true
+
+# --- Main Flow Tasks ---
+
+[tasks.default]
+description = "Default task: Formats, Lints, and Builds"
+dependencies = ["fmt", "clippy", "build"]
+
+[tasks.ci]
+description = "CI task: Runs checks without modifying files"
+dependencies = ["fmt-check", "clippy", "test"]
+
+# --- Atomic Tasks ---
+[tasks.run]
+description = "Runs the CLI tool with dynamic arguments"
+command = "cargo"
+# Added '-p grab' to explicitly target the CLI binary in the workspace
+args = ["run", "-p", "grab", "${@}"]
+
+[tasks.fmt]
+description = "Formats all source files"
+command = "cargo"
+args = ["fmt", "--all"]
+
+[tasks.fmt-check]
+description = "Checks formatting without modifying files (fails if unformatted)"
+command = "cargo"
+args = ["fmt", "--all", "--", "--check"]
+
+[tasks.clippy]
+description = "Runs Clippy lints on the workspace"
+command = "cargo"
+# Added '--workspace' to lint both crates
+args = [
+  "clippy",
+  "--workspace",
+  "--all-targets",
+  "--all-features",
+  "--",
+  "-D",
+  "warnings",
+]
+
+[tasks.test]
+description = "Runs tests for the grab crate only"
+command = "cargo"
+# Added '-p grab' to strictly run integration/unit tests for the CLI
+args = ["nextest", "run", "--no-fail-fast", "-p", "grab"]
