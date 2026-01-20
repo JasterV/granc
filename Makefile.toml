@@ -54,4 +54,4 @@ args = [
 description = "Runs tests for the grab crate only"
 command = "cargo"
 # Added '-p grab' to strictly run integration/unit tests for the CLI
-args = ["test", "-p", "grab"]
+args = ["nextest", "run", "--no-fail-fast", "-p", "grab"]
