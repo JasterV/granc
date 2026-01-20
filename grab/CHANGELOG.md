@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## `grab` - [0.1.1](https://github.com/JasterV/grab/compare/grab-v0.1.0...grab-v0.1.1) - 2026-01-20
+
+### Added
+- implement integration test for the gRPC client
+
+### Other
+- update README and CHANGELOG locations
+- setup correct README
+- set up for publishing
+
 ## `grab` - [0.1.0](https://github.com/JasterV/grab/compare/grab-v0.1.0...grab-v0.1.1) - 2026-01-20
 
 ### Added
