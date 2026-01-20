@@ -13,6 +13,7 @@ It is heavily inspired by tools like `grpcurl` but built to leverage the safety 
 ## 🚀 Features
 
 * **Dynamic Encoding/Decoding**: Transcodes JSON to Protobuf (and vice versa) on the fly using `prost-reflect`.
+* **Smart Dispatch**: Automatically detects if a call is Unary, Server Streaming, Client Streaming, or Bidirectional based on the descriptor.
 * **Fast Fail Validation**: Validates your JSON against the schema *before* hitting the network.
 * **Zero Compilation Dependencies**: Does not require generating Rust code for your protos. Just point to a descriptor file.
 * **Metadata Support**: Easily attach custom headers (authorization, tracing) to your requests.
@@ -28,12 +29,11 @@ Ensure you have Rust and Cargo installed.
 git clone [https://github.com/your-username/grab.git](https://github.com/your-username/grab.git)
 cd grab
 cargo install --path .
-
 ```
 
 ## 🛠️ Prerequisites: Generating Descriptors
 
-To use gRab, you need a binary **FileDescriptorSet** (`.bin` or `.pb`). This file contains the schema definitions for your services.
+To use gRab, you currently need a binary **FileDescriptorSet** (`.bin` or `.pb`). This file contains the schema definitions for your services.
 
 You can generate this using the standard `protoc` compiler:
 
@@ -51,44 +51,61 @@ protoc \
 
 ## 📖 Usage
 
-The basic syntax is:
+**Syntax:**
 
 ```bash
-grab unary [OPTIONS]
+grab [OPTIONS] <URL> <METHOD>
+
 ```
+
+### Arguments
+
+| Argument | Description | Required |
+| --- | --- | --- |
+| `<URL>` | Server address (e.g., `http://[::1]:50051`). | **Yes** |
+| `<METHOD>` | Fully qualified method name (e.g., `my.package.Service/Method`). | **Yes** |
 
 ### Options
 
 | Flag | Short | Description | Required |
 | --- | --- | --- | --- |
-| `--descriptor` | `-d` | Path to the binary FileDescriptorSet. | Yes |
-| `--addr` | `-a` | Server address (e.g., `http://[::1]:50051`). | Yes |
-| `--service` | `-s` | Fully qualified service name (e.g., `my.pkg.UserService`). | Yes |
-| `--method` | `-m` | Method name (e.g., `CreateUser`). | Yes |
-| `--json` | `-j` | The request body in JSON format. | Yes |
+| `--proto-set` |  | Path to the binary FileDescriptorSet (`.bin`). | **Yes** |
+| `--body` |  | The request body in JSON format. | **Yes** |
 | `--header` | `-H` | Custom header `key:value`. Can be used multiple times. | No |
 
-### Example
+### JSON Body Format
 
-Assuming you have a `Greeter` service running locally on port 50051:
+* **Unary / Server Streaming**: Provide a single JSON object `{ ... }`.
+* **Client / Bidirectional Streaming**: Provide a JSON array of objects `[ { ... }, { ... } ]`.
+
+### Examples
+
+**1. Unary Call**
 
 ```bash
-grab unary \
-  --descriptor ./descriptor.bin \
-  --addr http://localhost:50051 \
-  --service helloworld.Greeter \
-  --method SayHello \
-  --json "$(< payload.json)" \
-  -H "authorization: Bearer my-token"
+grab \
+  --proto-set ./descriptor.bin \
+  --body '{"name": "Ferris"}' \
+  http://localhost:50051 \
+  helloworld.Greeter/SayHello
 ```
 
-**Output:**
+**2. Bidirectional Streaming (Chat)**
 
-```json
-{
-  "message": "Hello Ferris"
-}
+```bash
+grab \
+  --proto-set ./descriptor.bin \
+  --body '[{"text": "Hello"}, {"text": "How are you?"}]' \
+  -H "authorization: Bearer token123" \
+  http://localhost:50051 \
+  chat.ChatService/StreamMessages
 ```
+
+## 🔮 Roadmap
+
+* **Automatic Server Reflection**: We are working on removing the requirement for the `--proto-set` file. Future versions will support fetching the schema directly from servers that have the [gRPC Server Reflection Protocol](https://github.com/grpc/grpc/blob/master/doc/server-reflection.md) enabled.
+* **Interactive Mode**: A REPL for streaming requests interactively.
+* **Pretty Printing**: Enhanced colored output for JSON responses.
 
 ## ⚠️ Common Errors
 
@@ -102,15 +119,10 @@ grab unary \
 * **Cause:** Typo in the method name or the method doesn't exist.
 * **Fix:** Ensure case sensitivity matches (e.g., `GetUser` vs `getUser`).
 
-**3. `JSON structure does not match Protobuf schema**`
+**3. `h2 protocol error**`
 
-* **Cause:** Your JSON payload has fields that don't exist in the proto message, or types are incorrect (e.g., string instead of int).
-* **Fix:** gRab validates this locally. Check your field names and types against the proto definition.
-
-**4. `h2 protocol error: error reading a body from connection`** (or `h2 protocol error`)
-
-* **Cause:** This often occurs when the JSON payload fails to encode *after* the connection has already been established. The client aborts the request stream mid-flight, causing the server to register a protocol error instead of a validation error.
-* **Fix:** Double-check your JSON payload against the Protobuf schema. Ensure all field names are correct and match the expected types (e.g., sending a string for an integer field, or using a field name that doesn't exist).
+* **Cause:** This often occurs when the JSON payload fails to encode *after* the connection has already been established, or the server rejected the stream structure.
+* **Fix:** Double-check your JSON payload against the Protobuf schema.
 
 ## 🤝 Contributing
 
