@@ -14,7 +14,7 @@ It is heavily inspired by tools like `grpcurl` but built to leverage the safety 
 
 * **Dynamic Encoding/Decoding**: Transcodes JSON to Protobuf (and vice versa) on the fly using `prost-reflect`.
 * **Smart Dispatch**: Automatically detects if a call is Unary, Server Streaming, Client Streaming, or Bidirectional based on the descriptor.
-* **Fast Fail Validation**: Validates your JSON against the schema *before* hitting the network.
+* **Fast Fail Validation**: Validates your JSON *before* hitting the network.
 * **Zero Compilation Dependencies**: Does not require generating Rust code for your protos. Just point to a descriptor file.
 * **Metadata Support**: Easily attach custom headers (authorization, tracing) to your requests.
 * **Tonic 0.14**: Built on the latest stable Rust gRPC stack.
@@ -26,7 +26,7 @@ It is heavily inspired by tools like `grpcurl` but built to leverage the safety 
 Ensure you have Rust and Cargo installed.
 
 ```bash
-git clone [https://github.com/your-username/grab.git](https://github.com/your-username/grab.git)
+git clone https://github.com/JasterV/grab
 cd grab
 cargo install --path .
 ```
