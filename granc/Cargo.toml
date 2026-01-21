@@ -12,6 +12,7 @@ readme = "README.md"
 repository = "https://github.com/JasterV/granc"
 rust-version = "1.89"
 version = "0.1.0"
+default-run = "granc"
 
 [features]
 gen-proto = ["dep:tonic-prost-build"]

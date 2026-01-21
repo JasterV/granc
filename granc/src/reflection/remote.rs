@@ -1,12 +1,17 @@
 use super::generated::reflection_v1::{
-    ServerReflectionRequest, server_reflection_client::ServerReflectionClient,
-    server_reflection_request::MessageRequest, server_reflection_response::MessageResponse,
+    ServerReflectionRequest, ServerReflectionResponse,
+    server_reflection_client::ServerReflectionClient, server_reflection_request::MessageRequest,
+    server_reflection_response::MessageResponse,
 };
-use crate::reflection::generated::reflection_v1::FileDescriptorResponse;
 use crate::reflection::local::LocalReflectionService;
+use anyhow::Context;
 use prost::Message;
 use prost_reflect::MethodDescriptor;
 use prost_types::{FileDescriptorProto, FileDescriptorSet};
+use std::collections::{HashMap, HashSet};
+use tokio::sync::mpsc;
+use tokio_stream::wrappers::ReceiverStream;
+use tonic::Streaming;
 use tonic::transport::{Channel, Endpoint};
 
 pub struct RemoteReflectionService {
@@ -24,76 +29,158 @@ impl RemoteReflectionService {
             .await
             .map_err(|e| anyhow::anyhow!("Failed to connect to {}: {}", base_url, e))?;
 
-        let client = ServerReflectionClient::new(channel);
-
-        Ok(Self { client, base_url })
+        Ok(Self {
+            client: ServerReflectionClient::new(channel),
+            base_url,
+        })
     }
 
     pub async fn fetch_method_descriptor(
         &mut self,
-        full_method_path: &str,
+        method_path: &str,
     ) -> anyhow::Result<MethodDescriptor> {
-        let request = ServerReflectionRequest {
-            host: self.base_url.clone(),
-            message_request: Some(MessageRequest::FileContainingSymbol(
-                full_method_path.to_string(),
-            )),
+        let (service_name, _) = parse_method_path(method_path)?;
+
+        // 1. Initialize Stream
+        let (tx, rx) = mpsc::channel(100);
+        let mut response_stream = self.start_stream(rx).await?;
+
+        // 2. Send Initial Request
+        let req = self.make_request(MessageRequest::FileContainingSymbol(
+            service_name.to_string(),
+        ));
+        tx.send(req).await?;
+
+        // 3. Fetch all transitive dependencies
+        let file_map = self.collect_descriptors(&mut response_stream, tx).await?;
+
+        // 4. Build Registry directly (Unsorted)
+        let fd_set = FileDescriptorSet {
+            file: file_map.into_values().collect(),
         };
 
-        let request_stream = tokio_stream::iter(vec![request]);
-
-        let mut response_stream = self
-            .client
-            .server_reflection_info(request_stream)
-            .await?
-            .into_inner();
-
-        // Process the first response
-        let Some(response) = response_stream.message().await? else {
-            return Err(anyhow::anyhow!("Reflection stream closed without response"));
-        };
-
-        let response = match response.message_response {
-            Some(MessageResponse::FileDescriptorResponse(descriptor_response)) => {
-                descriptor_response
-            }
-            Some(MessageResponse::ErrorResponse(e)) => {
-                return Err(anyhow::anyhow!(
-                    "Server returned reflection error: {} (code {})",
-                    e.error_message,
-                    e.error_code
-                ));
-            }
-            Some(_) => {
-                return Err(anyhow::anyhow!(
-                    "Received unexpected response type form reflection server"
-                ));
-            }
-            None => return Err(anyhow::anyhow!("Reflection response contained no message")),
-        };
-
-        let fd_set = build_file_descriptor_set(response)?;
-        let local_reflection_service = LocalReflectionService::from_file_descriptor_set(fd_set)?;
-
-        local_reflection_service
-            .fetch_method_descriptor(full_method_path)
+        LocalReflectionService::from_file_descriptor_set(fd_set)?
+            .fetch_method_descriptor(method_path)
             .map_err(From::from)
+    }
+
+    async fn start_stream(
+        &mut self,
+        rx: mpsc::Receiver<ServerReflectionRequest>,
+    ) -> anyhow::Result<Streaming<ServerReflectionResponse>> {
+        self.client
+            .clone()
+            .server_reflection_info(ReceiverStream::new(rx))
+            .await
+            .context("Failed to start reflection stream")
+            .map(|resp| resp.into_inner())
+    }
+
+    async fn collect_descriptors(
+        &self,
+        stream: &mut Streaming<ServerReflectionResponse>,
+        tx: mpsc::Sender<ServerReflectionRequest>,
+    ) -> anyhow::Result<HashMap<String, FileDescriptorProto>> {
+        let mut inflight = 1;
+        let mut file_map = HashMap::new();
+        let mut requested = HashSet::new();
+
+        while inflight > 0 {
+            let response = stream
+                .message()
+                .await?
+                .ok_or_else(|| anyhow::anyhow!("Stream closed unexpectedly"))?;
+
+            inflight -= 1;
+
+            let sent_count = self
+                .handle_response(response, &mut file_map, &mut requested, &tx)
+                .await?;
+
+            inflight += sent_count;
+        }
+
+        Ok(file_map)
+    }
+
+    async fn handle_response(
+        &self,
+        response: ServerReflectionResponse,
+        file_map: &mut HashMap<String, FileDescriptorProto>,
+        requested: &mut HashSet<String>,
+        tx: &mpsc::Sender<ServerReflectionRequest>,
+    ) -> anyhow::Result<usize> {
+        match response.message_response {
+            Some(MessageResponse::FileDescriptorResponse(res)) => {
+                self.process_descriptor_batch(res.file_descriptor_proto, file_map, requested, tx)
+                    .await
+            }
+            Some(MessageResponse::ErrorResponse(e)) => Err(anyhow::anyhow!(
+                "Server returned reflection error: {} (code {})",
+                e.error_message,
+                e.error_code
+            )),
+            Some(other) => Err(anyhow::anyhow!(
+                "Received unexpected response type: {:?}",
+                other
+            )),
+            None => Err(anyhow::anyhow!("Reflection response contained no message")),
+        }
+    }
+
+    async fn process_descriptor_batch(
+        &self,
+        raw_protos: Vec<Vec<u8>>,
+        file_map: &mut HashMap<String, FileDescriptorProto>,
+        requested: &mut HashSet<String>,
+        tx: &mpsc::Sender<ServerReflectionRequest>,
+    ) -> anyhow::Result<usize> {
+        let mut sent_count = 0;
+
+        for raw in raw_protos {
+            let fd = FileDescriptorProto::decode(raw.as_ref())
+                .context("Failed to decode FileDescriptorProto")?;
+
+            if let Some(name) = &fd.name {
+                if !file_map.contains_key(name) {
+                    sent_count += self
+                        .queue_dependencies(&fd, file_map, requested, tx)
+                        .await?;
+                    file_map.insert(name.clone(), fd);
+                }
+            }
+        }
+
+        Ok(sent_count)
+    }
+
+    async fn queue_dependencies(
+        &self,
+        fd: &FileDescriptorProto,
+        file_map: &HashMap<String, FileDescriptorProto>,
+        requested: &mut HashSet<String>,
+        tx: &mpsc::Sender<ServerReflectionRequest>,
+    ) -> anyhow::Result<usize> {
+        let mut count = 0;
+        for dep in &fd.dependency {
+            if !file_map.contains_key(dep) && requested.insert(dep.clone()) {
+                let req = self.make_request(MessageRequest::FileByFilename(dep.clone()));
+                tx.send(req).await?;
+                count += 1;
+            }
+        }
+        Ok(count)
+    }
+
+    fn make_request(&self, msg: MessageRequest) -> ServerReflectionRequest {
+        ServerReflectionRequest {
+            host: self.base_url.clone(),
+            message_request: Some(msg),
+        }
     }
 }
 
-fn build_file_descriptor_set(
-    response: FileDescriptorResponse,
-) -> Result<FileDescriptorSet, anyhow::Error> {
-    let mut fd_set = FileDescriptorSet::default();
-
-    // The server returns raw bytes for each FileDescriptorProto
-    for raw_proto in response.file_descriptor_proto {
-        let fd = FileDescriptorProto::decode(raw_proto.as_ref())?;
-        fd_set.file.push(fd);
-    }
-
-    // Make sure we remove duplicates
-    fd_set.file.dedup();
-
-    Ok(fd_set)
+fn parse_method_path(path: &str) -> anyhow::Result<(&str, &str)> {
+    path.split_once('/')
+        .ok_or_else(|| anyhow::anyhow!("Invalid method path"))
 }
