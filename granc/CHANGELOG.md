@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## `granc` - [0.2.3](https://github.com/JasterV/granc/releases/tag/granc-v0.2.3) - 2026-01-21
+
+### Other
+- release v0.2.3 ([#14](https://github.com/JasterV/granc/pull/14))
+- decouple ReflectionClient to possibly publish in a separate crate
+
 ## `granc` - [0.2.3](https://github.com/JasterV/granc/compare/granc-v0.2.2...granc-v0.2.3) - 2026-01-21
 
 ### Other
