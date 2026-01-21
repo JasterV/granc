@@ -15,6 +15,7 @@
 //!
 use super::codec::JsonCodec;
 use futures_util::Stream;
+use http_body::Body as HttpBody;
 use prost_reflect::MethodDescriptor;
 use std::str::FromStr;
 use thiserror::Error;
@@ -31,6 +32,9 @@ use tonic::{
 #[cfg(test)]
 mod integration_test;
 
+/// A type alias for the standard error type used in generic bounds.
+type BoxError = Box<dyn std::error::Error + Send + Sync + 'static>;
+
 #[derive(Error, Debug)]
 pub enum ClientError {
     #[error("Invalid uri '{addr}' provided: '{source}'")]
@@ -41,7 +45,7 @@ pub enum ClientError {
     #[error("Failed to connect: '{0}'")]
     ConnectionFailed(tonic::transport::Error),
     #[error("Internal error, the client was not ready: '{0}'")]
-    ClientNotReady(tonic::transport::Error),
+    ClientNotReady(#[source] BoxError),
     #[error("Invalid metadata (header) key '{key}': '{source}'")]
     InvalidMetadataKey {
         key: String,
@@ -55,11 +59,16 @@ pub enum ClientError {
 }
 
 /// A generic gRPC client that uses dynamic dispatch via `prost-reflect`.
-pub struct GrpcClient {
-    channel: Channel,
+///
+/// It can wrap any inner service `T` that implements `GrpcService<BoxBody>`,
+/// such as `tonic::transport::Channel` or a mock service.
+#[derive(Clone)]
+pub struct GrpcClient<T = Channel> {
+    service: T,
 }
 
-impl GrpcClient {
+/// Implementation for the standard network client using `Channel`.
+impl GrpcClient<Channel> {
     /// Connects to the specified gRPC server address.
     ///
     /// # Arguments
@@ -75,9 +84,18 @@ impl GrpcClient {
             .connect()
             .await
             .map_err(ClientError::ConnectionFailed)?;
-        Ok(Self { channel })
-    }
 
+        Ok(Self { service: channel })
+    }
+}
+
+/// Dynamic dispatch methods.
+impl<S> GrpcClient<S>
+where
+    S: tonic::client::GrpcService<tonic::body::Body> + Clone,
+    S::ResponseBody: HttpBody + Send + 'static,
+    <S::ResponseBody as HttpBody>::Error: Into<BoxError>,
+{
     /// Performs a Unary gRPC call (Single Request -> Single Response).
     ///
     /// # Returns
@@ -90,8 +108,11 @@ impl GrpcClient {
         payload: serde_json::Value,
         headers: Vec<(String, String)>,
     ) -> Result<Result<serde_json::Value, tonic::Status>, ClientError> {
-        let mut client = Grpc::new(self.channel.clone());
-        client.ready().await.map_err(ClientError::ClientNotReady)?;
+        let mut client = Grpc::new(self.service.clone());
+        client
+            .ready()
+            .await
+            .map_err(|e| ClientError::ClientNotReady(e.into()))?;
 
         let codec = JsonCodec::new(method.input(), method.output());
         let path = http_path(&method);
@@ -119,8 +140,11 @@ impl GrpcClient {
         Result<impl Stream<Item = Result<serde_json::Value, tonic::Status>>, tonic::Status>,
         ClientError,
     > {
-        let mut client = Grpc::new(self.channel.clone());
-        client.ready().await.map_err(ClientError::ClientNotReady)?;
+        let mut client = Grpc::new(self.service.clone());
+        client
+            .ready()
+            .await
+            .map_err(|e| ClientError::ClientNotReady(e.into()))?;
 
         let codec = JsonCodec::new(method.input(), method.output());
         let path = http_path(&method);
@@ -145,8 +169,11 @@ impl GrpcClient {
         payload_stream: impl Stream<Item = serde_json::Value> + Send + 'static,
         headers: Vec<(String, String)>,
     ) -> Result<Result<serde_json::Value, tonic::Status>, ClientError> {
-        let mut client = Grpc::new(self.channel.clone());
-        client.ready().await.map_err(ClientError::ClientNotReady)?;
+        let mut client = Grpc::new(self.service.clone());
+        client
+            .ready()
+            .await
+            .map_err(|e| ClientError::ClientNotReady(e.into()))?;
 
         let codec = JsonCodec::new(method.input(), method.output());
         let path = http_path(&method);
@@ -174,8 +201,11 @@ impl GrpcClient {
         Result<impl Stream<Item = Result<serde_json::Value, tonic::Status>>, tonic::Status>,
         ClientError,
     > {
-        let mut client = Grpc::new(self.channel.clone());
-        client.ready().await.map_err(ClientError::ClientNotReady)?;
+        let mut client = Grpc::new(self.service.clone());
+        client
+            .ready()
+            .await
+            .map_err(|e| ClientError::ClientNotReady(e.into()))?;
 
         let codec = JsonCodec::new(method.input(), method.output());
         let path = http_path(&method);

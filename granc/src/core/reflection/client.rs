@@ -20,20 +20,26 @@ use super::generated::reflection_v1::{
 };
 use crate::core::reflection::DescriptorRegistry;
 use anyhow::Context;
+use http_body::Body as HttpBody;
 use prost::Message;
 use prost_types::{FileDescriptorProto, FileDescriptorSet};
 use std::collections::{HashMap, HashSet};
 use tokio::sync::mpsc;
 use tokio_stream::wrappers::ReceiverStream;
-use tonic::Streaming;
 use tonic::transport::{Channel, Endpoint};
+use tonic::{Streaming, client::GrpcService};
 
-pub struct ReflectionClient {
-    client: ServerReflectionClient<Channel>,
+#[cfg(test)]
+mod integration_test;
+
+/// A generic client for the gRPC Server Reflection Protocol.
+pub struct ReflectionClient<T = Channel> {
+    client: ServerReflectionClient<T>,
     base_url: String,
 }
 
-impl ReflectionClient {
+/// Implementation for the standard network client.
+impl ReflectionClient<Channel> {
     pub async fn connect(base_url: String) -> anyhow::Result<Self> {
         let endpoint =
             Endpoint::new(base_url.clone()).map_err(|e| anyhow::anyhow!("Invalid URL: {}", e))?;
@@ -43,14 +49,20 @@ impl ReflectionClient {
             .await
             .map_err(|e| anyhow::anyhow!("Failed to connect to {}: {}", base_url, e))?;
 
-        Ok(Self {
-            client: ServerReflectionClient::new(channel),
-            base_url,
-        })
-    }
+        let client = ServerReflectionClient::new(channel);
 
-    /// Queries the server for a specific service and all its transitive dependencies.
-    /// Returns a fully-populated `DescriptorRegistry`.
+        Ok(Self { client, base_url })
+    }
+}
+
+impl<T> ReflectionClient<T>
+where
+    T: GrpcService<tonic::body::Body>,
+    T::Error: Into<Box<dyn std::error::Error + Send + Sync + 'static>>,
+    T::ResponseBody: HttpBody<Data = tonic::codegen::Bytes> + Send + 'static,
+    <T::ResponseBody as HttpBody>::Error:
+        Into<Box<dyn std::error::Error + Send + Sync + 'static>> + Send,
+{
     pub async fn get_service_descriptor(
         &mut self,
         service_name: &str,
@@ -60,7 +72,6 @@ impl ReflectionClient {
 
         let mut response_stream = self
             .client
-            .clone()
             .server_reflection_info(ReceiverStream::new(rx))
             .await
             .context("Failed to start reflection stream")?
