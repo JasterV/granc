@@ -24,7 +24,7 @@ async fn test_reflection_client_fetches_unary_echo() {
     let mut client = setup_reflection_client();
 
     let registry = client
-        .get_service_descriptor("echo.EchoService")
+        .resolve_service_descriptor_registry("echo.EchoService")
         .await
         .expect("Failed to fetch service descriptor");
 
@@ -52,7 +52,7 @@ async fn test_reflection_client_fetches_server_streaming_echo() {
     let mut client = setup_reflection_client();
 
     let registry = client
-        .get_service_descriptor("echo.EchoService")
+        .resolve_service_descriptor_registry("echo.EchoService")
         .await
         .expect("Failed to fetch service descriptor");
 
@@ -80,7 +80,7 @@ async fn test_reflection_client_fetches_client_streaming_echo() {
     let mut client = setup_reflection_client();
 
     let registry = client
-        .get_service_descriptor("echo.EchoService")
+        .resolve_service_descriptor_registry("echo.EchoService")
         .await
         .expect("Failed to fetch service descriptor");
 
@@ -108,7 +108,7 @@ async fn test_reflection_client_fetches_bidirectional_echo() {
     let mut client = setup_reflection_client();
 
     let registry = client
-        .get_service_descriptor("echo.EchoService")
+        .resolve_service_descriptor_registry("echo.EchoService")
         .await
         .expect("Failed to fetch service descriptor");
 
@@ -133,7 +133,9 @@ async fn test_reflection_client_fetches_bidirectional_echo() {
 async fn test_reflection_service_not_found_error() {
     let mut client = setup_reflection_client();
 
-    let result: Result<_, _> = client.get_service_descriptor("non.existent.Service").await;
+    let result: Result<_, _> = client
+        .resolve_service_descriptor_registry("non.existent.Service")
+        .await;
 
     assert!(result.is_err());
 }

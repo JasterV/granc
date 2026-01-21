@@ -13,6 +13,8 @@
 //!   raw `serde_json::Value` and `prost_reflect::MethodDescriptor`.
 //! * **Metadata Handling**: Converts generic string headers into `tonic::metadata` types.
 //!
+use crate::core::BoxError;
+
 use super::codec::JsonCodec;
 use futures_util::Stream;
 use http_body::Body as HttpBody;
@@ -31,9 +33,6 @@ use tonic::{
 
 #[cfg(test)]
 mod integration_test;
-
-/// A type alias for the standard error type used in generic bounds.
-type BoxError = Box<dyn std::error::Error + Send + Sync + 'static>;
 
 #[derive(Error, Debug)]
 pub enum ClientError {

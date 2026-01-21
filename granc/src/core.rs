@@ -23,6 +23,9 @@ use prost_reflect::MethodDescriptor;
 use reflection::{DescriptorRegistry, ReflectionClient};
 use std::path::PathBuf;
 
+/// Type alias for the standard boxed error used in generic bounds.
+pub type BoxError = Box<dyn std::error::Error + Send + Sync + 'static>;
+
 pub struct Input {
     pub proto_set: Option<PathBuf>,
     pub body: serde_json::Value,
@@ -47,7 +50,9 @@ pub async fn run(input: Input) -> anyhow::Result<Output> {
         // If no proto-set file is passed, we'll try to reach the server reflection service
         None => {
             let mut service = ReflectionClient::connect(input.url.clone()).await?;
-            service.get_service_descriptor(&input.service).await?
+            service
+                .resolve_service_descriptor_registry(&input.service)
+                .await?
         }
     };
 

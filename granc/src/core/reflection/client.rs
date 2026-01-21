@@ -18,8 +18,8 @@ use super::generated::reflection_v1::{
     server_reflection_client::ServerReflectionClient, server_reflection_request::MessageRequest,
     server_reflection_response::MessageResponse,
 };
+use crate::core::BoxError;
 use crate::core::reflection::DescriptorRegistry;
-use anyhow::Context;
 use http_body::Body as HttpBody;
 use prost::Message;
 use prost_types::{FileDescriptorProto, FileDescriptorSet};
@@ -32,6 +32,41 @@ use tonic::{Streaming, client::GrpcService};
 #[cfg(test)]
 mod integration_test;
 
+#[derive(Debug, thiserror::Error)]
+pub enum ReflectionConnectError {
+    #[error("Invalid URL '{0}': {1}")]
+    InvalidUrl(String, #[source] tonic::transport::Error),
+    #[error("Failed to connect to '{0}': {1}")]
+    ConnectionFailed(String, #[source] tonic::transport::Error),
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum ReflectionResolveError {
+    #[error("Failed to start reflection stream: {0}")]
+    ServerStreamInitFailed(#[source] tonic::Status),
+
+    #[error("The server stream returned an error status: '{0}'")]
+    ServerStreamFailure(#[source] tonic::Status),
+
+    #[error("Reflection stream closed unexpectedly")]
+    StreamClosed,
+
+    #[error("Internal error: Failed to send request to stream")]
+    SendFailed,
+
+    #[error("Server returned reflection error code {code}: {message}")]
+    ServerError { code: i32, message: String },
+
+    #[error("Protocol error: Received unexpected response type: {0}")]
+    UnexpectedResponseType(String),
+
+    #[error("Failed to decode FileDescriptorProto: {0}")]
+    DecodeError(#[from] prost::DecodeError),
+
+    #[error("Failed to build DescriptorRegistry: {0}")]
+    RegistryError(#[from] crate::core::reflection::registry::ReflectionError),
+}
+
 /// A generic client for the gRPC Server Reflection Protocol.
 pub struct ReflectionClient<T = Channel> {
     client: ServerReflectionClient<T>,
@@ -40,14 +75,14 @@ pub struct ReflectionClient<T = Channel> {
 
 /// Implementation for the standard network client.
 impl ReflectionClient<Channel> {
-    pub async fn connect(base_url: String) -> anyhow::Result<Self> {
-        let endpoint =
-            Endpoint::new(base_url.clone()).map_err(|e| anyhow::anyhow!("Invalid URL: {}", e))?;
+    pub async fn connect(base_url: String) -> Result<Self, ReflectionConnectError> {
+        let endpoint = Endpoint::new(base_url.clone())
+            .map_err(|e| ReflectionConnectError::InvalidUrl(base_url.clone(), e))?;
 
         let channel = endpoint
             .connect()
             .await
-            .map_err(|e| anyhow::anyhow!("Failed to connect to {}: {}", base_url, e))?;
+            .map_err(|e| ReflectionConnectError::ConnectionFailed(base_url.clone(), e))?;
 
         let client = ServerReflectionClient::new(channel);
 
@@ -58,15 +93,14 @@ impl ReflectionClient<Channel> {
 impl<T> ReflectionClient<T>
 where
     T: GrpcService<tonic::body::Body>,
-    T::Error: Into<Box<dyn std::error::Error + Send + Sync + 'static>>,
+    T::Error: Into<BoxError>,
     T::ResponseBody: HttpBody<Data = tonic::codegen::Bytes> + Send + 'static,
-    <T::ResponseBody as HttpBody>::Error:
-        Into<Box<dyn std::error::Error + Send + Sync + 'static>> + Send,
+    <T::ResponseBody as HttpBody>::Error: Into<BoxError> + Send,
 {
-    pub async fn get_service_descriptor(
+    pub async fn resolve_service_descriptor_registry(
         &mut self,
         service_name: &str,
-    ) -> anyhow::Result<DescriptorRegistry> {
+    ) -> Result<DescriptorRegistry, ReflectionResolveError> {
         // Initialize Stream
         let (tx, rx) = mpsc::channel(100);
 
@@ -74,7 +108,7 @@ where
             .client
             .server_reflection_info(ReceiverStream::new(rx))
             .await
-            .context("Failed to start reflection stream")?
+            .map_err(ReflectionResolveError::ServerStreamInitFailed)?
             .into_inner();
 
         // Send Initial Request
@@ -85,7 +119,9 @@ where
             )),
         };
 
-        tx.send(req).await?;
+        tx.send(req)
+            .await
+            .map_err(|_| ReflectionResolveError::SendFailed)?;
 
         // Fetch all transitive dependencies
         let file_map = self.collect_descriptors(&mut response_stream, tx).await?;
@@ -102,7 +138,7 @@ where
         &self,
         response_stream: &mut Streaming<ServerReflectionResponse>,
         request_channel: mpsc::Sender<ServerReflectionRequest>,
-    ) -> anyhow::Result<HashMap<String, FileDescriptorProto>> {
+    ) -> Result<HashMap<String, FileDescriptorProto>, ReflectionResolveError> {
         let mut inflight = 1;
         let mut collected_files = HashMap::new();
         let mut requested = HashSet::new();
@@ -110,8 +146,9 @@ where
         while inflight > 0 {
             let response = response_stream
                 .message()
-                .await?
-                .ok_or_else(|| anyhow::anyhow!("Stream closed unexpectedly"))?;
+                .await
+                .map_err(ReflectionResolveError::ServerStreamFailure)?
+                .ok_or(ReflectionResolveError::StreamClosed)?;
 
             inflight -= 1;
 
@@ -129,19 +166,22 @@ where
                     inflight += sent_count;
                 }
                 Some(MessageResponse::ErrorResponse(e)) => {
-                    return Err(anyhow::anyhow!(
-                        "Server returned reflection error: {} (code {})",
-                        e.error_message,
-                        e.error_code
-                    ));
+                    return Err(ReflectionResolveError::ServerError {
+                        message: e.error_message,
+                        code: e.error_code,
+                    });
                 }
                 Some(other) => {
-                    return Err(anyhow::anyhow!(
-                        "Received unexpected response type: {:?}",
+                    return Err(ReflectionResolveError::UnexpectedResponseType(format!(
+                        "{:?}",
                         other
+                    )));
+                }
+                None => {
+                    return Err(ReflectionResolveError::UnexpectedResponseType(
+                        "Empty Message".into(),
                     ));
                 }
-                None => return Err(anyhow::anyhow!("Reflection response contained no message")),
             }
         }
 
@@ -154,12 +194,11 @@ where
         collected_files: &mut HashMap<String, FileDescriptorProto>,
         requested: &mut HashSet<String>,
         tx: &mpsc::Sender<ServerReflectionRequest>,
-    ) -> anyhow::Result<usize> {
+    ) -> Result<usize, ReflectionResolveError> {
         let mut sent_count = 0;
 
         for raw in raw_protos {
-            let fd = FileDescriptorProto::decode(raw.as_ref())
-                .context("Failed to decode FileDescriptorProto")?;
+            let fd = FileDescriptorProto::decode(raw.as_ref())?;
 
             if let Some(name) = &fd.name
                 && !collected_files.contains_key(name)
@@ -181,7 +220,7 @@ where
         collected_files: &HashMap<String, FileDescriptorProto>,
         requested: &mut HashSet<String>,
         tx: &mpsc::Sender<ServerReflectionRequest>,
-    ) -> anyhow::Result<usize> {
+    ) -> Result<usize, ReflectionResolveError> {
         let mut count = 0;
 
         for dep in &fd.dependency {
@@ -191,7 +230,9 @@ where
                     message_request: Some(MessageRequest::FileByFilename(dep.clone())),
                 };
 
-                tx.send(req).await?;
+                tx.send(req)
+                    .await
+                    .map_err(|_| ReflectionResolveError::SendFailed)?;
                 count += 1;
             }
         }
