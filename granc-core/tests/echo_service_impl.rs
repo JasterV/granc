@@ -1,6 +1,5 @@
 use echo_service::EchoService;
 use echo_service::pb::{EchoRequest, EchoResponse};
-
 use futures_util::Stream;
 use std::pin::Pin;
 use tokio::sync::mpsc;

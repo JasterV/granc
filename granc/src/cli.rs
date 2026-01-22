@@ -1,19 +1,16 @@
-//! # Command Line Interface Definition
+//! # CLI
 //!
-//! This module utilizes `clap` to define the command-line arguments and flags
-//! accepted by the application. It acts as the user-facing entry point, responsible for:
+//! This module defines the command-line interface of `granc` using `clap`.
 //!
-//! 1. **Parsing**: extracting and ensuring each argument and flag can be parsed to the target Rust types.
-//! 2. **Conversion**: transforming the raw arguments into the `crate::core::Input` struct used by the core logic.
-//!
+//! It is responsible for parsing user input and performing validation (e.g., ensuring headers are `key:value`);
 use clap::Parser;
-use std::path::PathBuf;
+use granc_core::client::DynamicRequest;
 
 #[derive(Parser)]
 #[command(name = "granc", version, about = "Dynamic gRPC CLI")]
 pub struct Cli {
-    #[arg(long, help = "Path to the descriptor set (.bin)")]
-    pub proto_set: Option<PathBuf>,
+    #[arg(long, help = "Path to the descriptor set (.bin)", value_parser = parse_file_descriptor_set)]
+    pub file_descriptor_set: Option<Vec<u8>>,
 
     #[arg(long, help = "JSON body (Object for Unary, Array for Streaming)", value_parser = parse_body)]
     pub body: serde_json::Value,
@@ -28,20 +25,26 @@ pub struct Cli {
     pub endpoint: (String, String),
 }
 
-impl From<Cli> for crate::core::Input {
+impl From<Cli> for DynamicRequest {
     /// Converts the raw CLI arguments into the internal `Input` representation.
     fn from(value: Cli) -> Self {
         let (service, method) = value.endpoint;
 
         Self {
-            proto_set: value.proto_set,
+            file_descriptor_set: value.file_descriptor_set,
             body: value.body,
             headers: value.headers,
-            url: value.url,
             service,
             method,
         }
     }
+}
+
+fn parse_file_descriptor_set(path: &str) -> Result<Vec<u8>, String> {
+    let path = path.trim();
+
+    std::fs::read(path)
+        .map_err(|err| format!("Failed to read file descriptor set at path '{path}': '{err}'"))
 }
 
 fn parse_endpoint(value: &str) -> Result<(String, String), String> {

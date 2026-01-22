@@ -1,7 +1,5 @@
-use echo_service::{
-    EchoService,
-    pb::{EchoRequest, EchoResponse},
-};
+use echo_service::EchoService;
+use echo_service::pb::{EchoRequest, EchoResponse};
 use tokio_stream::wrappers::ReceiverStream;
 use tonic::{Request, Response, Status, Streaming};
 

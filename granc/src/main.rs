@@ -1,23 +1,36 @@
-#![doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/README.md"))]
+//! # Granc CLI Entry Point
+//!
+//! The main executable for the Granc tool. This file drives the application lifecycle:
+//!
+//! 1. **Initialization**: Parses command-line arguments using [`cli::Cli`].
+//! 2. **Connection**: Establishes a TCP connection to the target server via `granc_core`.
+//! 3. **Execution**: Delegates the request processing to the `GrancClient`.
+//! 4. **Presentation**: Formats and prints the resulting JSON or error status to standard output/error.
 
 mod cli;
-mod core;
 
 use clap::Parser;
 use cli::Cli;
+use granc_core::client::{DynamicRequest, DynamicResponse, GrancClient};
 use std::process;
-
-use crate::core::Output;
 
 #[tokio::main]
 async fn main() {
     let args = Cli::parse();
 
-    match core::run(core::Input::from(args)).await {
-        Ok(Output::Unary(Ok(value))) => print_json(&value),
-        Ok(Output::Unary(Err(status))) => print_status(&status),
-        Ok(Output::Streaming(Ok(values))) => print_stream(&values),
-        Ok(Output::Streaming(Err(status))) => print_status(&status),
+    let mut client = match GrancClient::connect(&args.url).await {
+        Ok(client) => client,
+        Err(err) => {
+            eprintln!("Error: {err}");
+            process::exit(1);
+        }
+    };
+
+    match client.dynamic(DynamicRequest::from(args)).await {
+        Ok(DynamicResponse::Unary(Ok(value))) => print_json(&value),
+        Ok(DynamicResponse::Unary(Err(status))) => print_status(&status),
+        Ok(DynamicResponse::Streaming(Ok(values))) => print_stream(&values),
+        Ok(DynamicResponse::Streaming(Err(status))) => print_status(&status),
         Err(err) => {
             eprintln!("Error: {err}");
             process::exit(1);
