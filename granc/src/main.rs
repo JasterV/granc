@@ -18,6 +18,28 @@ use std::process;
 async fn main() {
     let args = Cli::parse();
 
+    let file_descriptor_set = match args
+        .file_descriptor_set
+        .map(|path| std::fs::read(path))
+        .transpose()
+    {
+        Ok(fd) => fd,
+        Err(err) => {
+            eprintln!("Error reading file descriptor set: '{err}'");
+            process::exit(1);
+        }
+    };
+
+    let (service, method) = args.endpoint;
+
+    let request = DynamicRequest {
+        file_descriptor_set,
+        body: args.body,
+        headers: args.headers,
+        service,
+        method,
+    };
+
     let mut client = match GrancClient::connect(&args.url).await {
         Ok(client) => client,
         Err(err) => {
@@ -26,7 +48,7 @@ async fn main() {
         }
     };
 
-    match client.dynamic(DynamicRequest::from(args)).await {
+    match client.dynamic(DynamicRequest::from(request)).await {
         Ok(DynamicResponse::Unary(Ok(value))) => print_json(&value),
         Ok(DynamicResponse::Unary(Err(status))) => print_status(&status),
         Ok(DynamicResponse::Streaming(Ok(values))) => print_stream(&values),
