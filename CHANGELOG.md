@@ -7,23 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## `granc` - [0.3.1](https://github.com/JasterV/granc/compare/granc-v0.3.0...granc-v0.3.1) - 2026-01-22
+## `granc` - [0.4.0](https://github.com/JasterV/granc/compare/granc-v0.2.4...granc-v0.4.0) - 2026-01-22
 
-### Other
-- update Cargo.lock dependencies
+- Made a mistake publishing `granc 0.3` and introduced bugs, `granc 0.4` fixes them and its the first working version after `0.2.4`.
 
 ## `granc_core` - [0.3.1](https://github.com/JasterV/granc/compare/granc_core-v0.3.0...granc_core-v0.3.1) - 2026-01-22
 
 ### Other
-- update granc-core documentation
+
+- Update granc-core documentation
 
 ## `granc_core` - [0.3.0](https://github.com/JasterV/granc/compare/granc_core-v0.2.4...granc_core-v0.3.0) - 2026-01-22
 
-- Separate reflection generation binary to not be published ([#20](https://github.com/JasterV/granc/pull/20))
-
-## `granc` - [0.3.0](https://github.com/JasterV/granc/compare/granc_core-v0.2.4...granc_core-v0.3.0) - 2026-01-22
-
-- Separate reflection generation binary to not be published ([#20](https://github.com/JasterV/granc/pull/20))
+- Fix: separate reflection generation binary to not be published ([#20](https://github.com/JasterV/granc/pull/20))
 
 ## `granc` - [0.2.4](https://github.com/JasterV/granc/compare/granc-v0.2.3...granc-v0.2.4) - 2026-01-22
 

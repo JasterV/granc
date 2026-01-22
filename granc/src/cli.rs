@@ -3,14 +3,15 @@
 //! This module defines the command-line interface of `granc` using `clap`.
 //!
 //! It is responsible for parsing user input and performing validation (e.g., ensuring headers are `key:value`);
+use std::path::PathBuf;
+
 use clap::Parser;
-use granc_core::client::DynamicRequest;
 
 #[derive(Parser)]
 #[command(name = "granc", version, about = "Dynamic gRPC CLI")]
 pub struct Cli {
-    #[arg(long, help = "Path to the descriptor set (.bin)", value_parser = parse_file_descriptor_set)]
-    pub file_descriptor_set: Option<Vec<u8>>,
+    #[arg(long, help = "Path to the descriptor set (.bin)")]
+    pub file_descriptor_set: Option<PathBuf>,
 
     #[arg(long, help = "JSON body (Object for Unary, Array for Streaming)", value_parser = parse_body)]
     pub body: serde_json::Value,
@@ -23,28 +24,6 @@ pub struct Cli {
 
     #[arg(help = "Endpoint (package.Service/Method)", value_parser = parse_endpoint)]
     pub endpoint: (String, String),
-}
-
-impl From<Cli> for DynamicRequest {
-    /// Converts the raw CLI arguments into the internal `Input` representation.
-    fn from(value: Cli) -> Self {
-        let (service, method) = value.endpoint;
-
-        Self {
-            file_descriptor_set: value.file_descriptor_set,
-            body: value.body,
-            headers: value.headers,
-            service,
-            method,
-        }
-    }
-}
-
-fn parse_file_descriptor_set(path: &str) -> Result<Vec<u8>, String> {
-    let path = path.trim();
-
-    std::fs::read(path)
-        .map_err(|err| format!("Failed to read file descriptor set at path '{path}': '{err}'"))
 }
 
 fn parse_endpoint(value: &str) -> Result<(String, String), String> {
