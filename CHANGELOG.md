@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## `granc_core` - [0.3.0](https://github.com/JasterV/granc/compare/granc_core-v0.2.4...granc_core-v0.3.0) - 2026-01-22
+
+- Separate reflection generation binary to not be published ([#20](https://github.com/JasterV/granc/pull/20))
+
+## `granc` - [0.3.0](https://github.com/JasterV/granc/compare/granc_core-v0.2.4...granc_core-v0.3.0) - 2026-01-22
+
+- Separate reflection generation binary to not be published ([#20](https://github.com/JasterV/granc/pull/20))
+
 ## `granc` - [0.2.4](https://github.com/JasterV/granc/compare/granc-v0.2.3...granc-v0.2.4) - 2026-01-22
 
 - **Published granc-core** as a library crate `granc-core` ([#16](https://github.com/JasterV/granc/pull/16))
