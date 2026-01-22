@@ -327,10 +327,10 @@ dependencies = [
 
 [[package]]
 name = "granc"
-version = "0.3.2"
+version = "0.3.3"
 dependencies = [
  "clap",
- "granc_core 0.2.4",
+ "granc_core 0.3.2",
  "serde_json",
  "tokio",
  "tonic",
@@ -345,9 +345,9 @@ dependencies = [
 
 [[package]]
 name = "granc_core"
-version = "0.2.4"
+version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2b70761ae61e50a3da701f80dec0a5768e43420895922e233894865ce3969cea"
+checksum = "fff4a50a8ba844e014eeee91873f2afe959d65b97c8f12c3a904ac0e3c87841f"
 dependencies = [
  "futures-util",
  "http",
@@ -365,7 +365,7 @@ dependencies = [
 
 [[package]]
 name = "granc_core"
-version = "0.3.2"
+version = "0.3.3"
 dependencies = [
  "echo-service",
  "futures-util",
