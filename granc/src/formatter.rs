@@ -17,7 +17,7 @@ pub struct ServiceList(pub Vec<String>);
 
 impl std::fmt::Display for FormattedString {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(f, "")?;
+        writeln!(f)?;
         writeln!(f, "{}", self.0)?;
         Ok(())
     }
@@ -133,7 +133,7 @@ impl From<ServiceDescriptor> for FormattedString {
             out.push_str(&method_fmt.0);
             out.push_str("\n\n");
         }
-        out.push_str("}");
+        out.push('}');
         FormattedString(out)
     }
 }
@@ -220,7 +220,7 @@ impl From<MessageDescriptor> for FormattedString {
                 ));
             }
         }
-        out.push_str("}");
+        out.push('}');
         FormattedString(out)
     }
 }
@@ -241,7 +241,7 @@ impl From<EnumDescriptor> for FormattedString {
                 val.number().to_string().purple()
             ));
         }
-        out.push_str("}");
+        out.push('}');
 
         FormattedString(out)
     }
