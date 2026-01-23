@@ -165,9 +165,8 @@ where
             .file_descriptor_set_by_symbol(service_name)
             .await?;
 
-        let pool = DescriptorPool::from_file_descriptor_set(fd_set)?;
-
-        pool.get_service_by_name(service_name)
+        DescriptorPool::from_file_descriptor_set(fd_set)?
+            .get_service_by_name(service_name)
             .ok_or_else(|| GetServiceDescriptorError::ServiceNotFound(service_name.to_string()))
     }
 
@@ -183,13 +182,9 @@ where
             .file_descriptor_set_by_symbol(service_name)
             .await?;
 
-        let pool = DescriptorPool::from_file_descriptor_set(fd_set)?;
-
-        let service = pool
+        DescriptorPool::from_file_descriptor_set(fd_set)?
             .get_service_by_name(service_name)
-            .ok_or_else(|| GetMethodDescriptorError::ServiceNotFound(service_name.to_string()))?;
-
-        service
+            .ok_or_else(|| GetMethodDescriptorError::ServiceNotFound(service_name.to_string()))?
             .methods()
             .find(|m| m.name() == method_name)
             .ok_or_else(|| GetMethodDescriptorError::MethodNotFound(method_name.to_string()))
@@ -205,9 +200,8 @@ where
             .file_descriptor_set_by_symbol(message_name)
             .await?;
 
-        let pool = DescriptorPool::from_file_descriptor_set(fd_set)?;
-
-        pool.get_message_by_name(message_name)
+        DescriptorPool::from_file_descriptor_set(fd_set)?
+            .get_message_by_name(message_name)
             .ok_or_else(|| GetMessageDescriptorError::MessageNotFound(message_name.to_string()))
     }
 
@@ -227,11 +221,9 @@ where
             }
         };
 
-        let service = pool
+        let method = pool
             .get_service_by_name(&request.service)
-            .ok_or_else(|| DynamicCallError::ServiceNotFound(request.service))?;
-
-        let method = service
+            .ok_or_else(|| DynamicCallError::ServiceNotFound(request.service))?
             .methods()
             .find(|m| m.name() == request.method)
             .ok_or_else(|| DynamicCallError::MethodNotFound(request.method))?;

@@ -17,6 +17,8 @@ use formatter::FormattedString;
 use granc_core::client::{DynamicRequest, DynamicResponse, GrancClient};
 use std::process;
 
+use crate::formatter::ServiceList;
+
 #[tokio::main]
 async fn main() {
     let args = Cli::parse();
@@ -53,7 +55,7 @@ async fn connect_or_exit(url: &str) -> GrancClient {
     match GrancClient::connect(url).await {
         Ok(client) => client,
         Err(err) => {
-            eprintln!("Error connecting to {}: {}", url, err);
+            eprintln!("{}", FormattedString::from(err));
             process::exit(1);
         }
     }
@@ -64,13 +66,10 @@ async fn list_services(url: &str) {
 
     match client.list_services().await {
         Ok(services) => {
-            println!("Available Services:");
-            for svc in services {
-                println!("  - {}", svc);
-            }
+            println!("{}", FormattedString::from(ServiceList(services)));
         }
         Err(e) => {
-            eprintln!("Failed to list services: {}", e);
+            eprintln!("{}", FormattedString::from(e));
             process::exit(1);
         }
     }
@@ -82,7 +81,7 @@ async fn describe_service(url: &str, service_name: &str) {
     match client.get_service_descriptor(service_name).await {
         Ok(descriptor) => println!("{}", FormattedString::from(descriptor)),
         Err(e) => {
-            eprintln!("Failed to inspect service '{}': '{}'", service_name, e);
+            eprintln!("{}", FormattedString::from(e));
             process::exit(1);
         }
     }
@@ -91,21 +90,16 @@ async fn describe_service(url: &str, service_name: &str) {
 async fn describe_method(url: &str, service_name: &str, method_name: &str) {
     let mut client = connect_or_exit(url).await;
 
-    let descriptor = match client
+    match client
         .get_method_descriptor(service_name, method_name)
         .await
     {
-        Ok(desc) => desc,
+        Ok(descriptor) => println!("{}", FormattedString::from(descriptor)),
         Err(e) => {
-            eprintln!(
-                "Failed to describe method '{}/{}': {}",
-                service_name, method_name, e
-            );
+            eprintln!("{}", FormattedString::from(e));
             process::exit(1);
         }
-    };
-
-    println!("{}", FormattedString::from(descriptor));
+    }
 }
 
 async fn describe_message(url: &str, message_name: &str, recursive: bool) {
@@ -114,15 +108,13 @@ async fn describe_message(url: &str, message_name: &str, recursive: bool) {
     match client.get_message_descriptor(message_name).await {
         Ok(descriptor) => {
             if recursive {
-                // ExpandedMessage triggers the recursive printing logic from printer.rs
                 println!("{}", FormattedString::from(ExpandedMessage(descriptor)));
             } else {
-                // Direct Formatted::from prints only the first level
                 println!("{}", FormattedString::from(descriptor));
             }
         }
         Err(e) => {
-            eprintln!("Failed to inspect message '{}': {}", message_name, e);
+            eprintln!("{}", FormattedString::from(e));
             process::exit(1);
         }
     }
@@ -139,7 +131,7 @@ async fn run_call(
     let file_descriptor_set = match file_descriptor_set.map(std::fs::read).transpose() {
         Ok(fd) => fd,
         Err(err) => {
-            eprintln!("Error reading file descriptor set: '{err}'");
+            eprintln!("{}", FormattedString::from(err));
             process::exit(1);
         }
     };
@@ -162,7 +154,7 @@ async fn run_call(
             println!("{}", FormattedString::from(status))
         }
         Err(err) => {
-            eprintln!("Error: {err}");
+            eprintln!("{}", FormattedString::from(err));
             process::exit(1);
         }
     }

@@ -1,8 +1,12 @@
 use std::collections::HashSet;
 
 use colored::*;
-use granc_core::prost_reflect::{
-    EnumDescriptor, Kind, MessageDescriptor, MethodDescriptor, ServiceDescriptor,
+use granc_core::{
+    client::{
+        ClientConnectError, DynamicCallError, GetMessageDescriptorError, GetMethodDescriptorError,
+        GetServiceDescriptorError, ListServicesError,
+    },
+    prost_reflect::{EnumDescriptor, Kind, MessageDescriptor, MethodDescriptor, ServiceDescriptor},
 };
 use tonic::Status;
 
@@ -13,6 +17,8 @@ pub struct FormattedString(pub String);
 
 /// A wrapper to indicate we want to print a message AND all its dependencies recursively.
 pub struct ExpandedMessage(pub MessageDescriptor);
+
+pub struct ServiceList(pub Vec<String>);
 
 impl std::fmt::Display for FormattedString {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -36,6 +42,83 @@ impl From<Status> for FormattedString {
             status.code(),
             status.message()
         ))
+    }
+}
+
+impl From<std::io::Error> for FormattedString {
+    fn from(err: std::io::Error) -> Self {
+        FormattedString(format!(
+            "{}\n\n'{}'",
+            "Failed to read file:".red().bold(),
+            err
+        ))
+    }
+}
+
+impl From<ClientConnectError> for FormattedString {
+    fn from(err: ClientConnectError) -> Self {
+        FormattedString(format!("{}\n\n'{}'", "Connection Error:".red().bold(), err))
+    }
+}
+
+impl From<ListServicesError> for FormattedString {
+    fn from(err: ListServicesError) -> Self {
+        FormattedString(format!(
+            "{}\n\n'{}'",
+            "Failed to list services:".red().bold(),
+            err
+        ))
+    }
+}
+
+impl From<GetServiceDescriptorError> for FormattedString {
+    fn from(err: GetServiceDescriptorError) -> Self {
+        FormattedString(format!(
+            "{}\n\n'{}'",
+            "Service Lookup Failed:".red().bold(),
+            err
+        ))
+    }
+}
+
+impl From<GetMethodDescriptorError> for FormattedString {
+    fn from(err: GetMethodDescriptorError) -> Self {
+        FormattedString(format!(
+            "{}\n\n'{}'",
+            "Method Lookup Failed:".red().bold(),
+            err
+        ))
+    }
+}
+
+impl From<GetMessageDescriptorError> for FormattedString {
+    fn from(err: GetMessageDescriptorError) -> Self {
+        FormattedString(format!(
+            "{}\n\n'{}'",
+            "Message Lookup Failed:".red().bold(),
+            err
+        ))
+    }
+}
+
+impl From<DynamicCallError> for FormattedString {
+    fn from(err: DynamicCallError) -> Self {
+        FormattedString(format!("{}\n\n'{}'", "Call Failed:".red().bold(), err))
+    }
+}
+
+impl From<ServiceList> for FormattedString {
+    fn from(ServiceList(services): ServiceList) -> Self {
+        if services.is_empty() {
+            return FormattedString("No services found.".yellow().to_string());
+        }
+
+        let mut out = String::new();
+        out.push_str("Available Services:\n");
+        for svc in services {
+            out.push_str(&format!("  - {}\n", svc.green()));
+        }
+        FormattedString(out.trim_end().to_string())
     }
 }
 
