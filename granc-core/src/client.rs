@@ -22,7 +22,9 @@ use crate::{
 };
 use futures_util::Stream;
 use http_body::Body as HttpBody;
-use prost_reflect::{DescriptorError, DescriptorPool};
+use prost_reflect::{
+    DescriptorError, DescriptorPool, MessageDescriptor, MethodDescriptor, ServiceDescriptor,
+};
 use tokio_stream::StreamExt;
 use tonic::transport::{Channel, Endpoint};
 
@@ -35,7 +37,45 @@ pub enum ClientConnectError {
 }
 
 #[derive(Debug, thiserror::Error)]
-pub enum DynamicRequestError {
+pub enum ListServicesError {
+    #[error("Reflection resolution failed: '{0}'")]
+    ReflectionResolve(#[from] ReflectionResolveError),
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum GetServiceDescriptorError {
+    #[error("Reflection resolution failed: '{0}'")]
+    ReflectionResolve(#[from] ReflectionResolveError),
+    #[error("Failed to decode file descriptor set: '{0}'")]
+    DescriptorError(#[from] DescriptorError),
+    #[error("Service '{0}' not found")]
+    ServiceNotFound(String),
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum GetMethodDescriptorError {
+    #[error("Reflection resolution failed: '{0}'")]
+    ReflectionResolve(#[from] ReflectionResolveError),
+    #[error("Failed to decode file descriptor set: '{0}'")]
+    DescriptorError(#[from] DescriptorError),
+    #[error("Service '{0}' not found")]
+    ServiceNotFound(String),
+    #[error("Method '{0}' not found")]
+    MethodNotFound(String),
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum GetMessageDescriptorError {
+    #[error("Reflection resolution failed: '{0}'")]
+    ReflectionResolve(#[from] ReflectionResolveError),
+    #[error("Failed to decode file descriptor set: '{0}'")]
+    DescriptorError(#[from] DescriptorError),
+    #[error("Message '{0}' not found")]
+    MessageNotFound(String),
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum DynamicCallError {
     #[error("Invalid input: '{0}'")]
     InvalidInput(String),
 
@@ -106,10 +146,75 @@ where
         }
     }
 
+    /// Fetches the list of available services from the server using reflection.
+    pub async fn list_services(&mut self) -> Result<Vec<String>, ListServicesError> {
+        self.reflection_client
+            .list_services()
+            .await
+            .map_err(Into::into)
+    }
+
+    /// Fetches the descriptor for a specific service using reflection.
+    /// This allows inspecting methods and types.
+    pub async fn get_service_descriptor(
+        &mut self,
+        service_name: &str,
+    ) -> Result<ServiceDescriptor, GetServiceDescriptorError> {
+        let fd_set = self
+            .reflection_client
+            .file_descriptor_set_by_symbol(service_name)
+            .await?;
+
+        let pool = DescriptorPool::from_file_descriptor_set(fd_set)?;
+
+        pool.get_service_by_name(service_name)
+            .ok_or_else(|| GetServiceDescriptorError::ServiceNotFound(service_name.to_string()))
+    }
+
+    /// Fetches the descriptor for a specific service using reflection.
+    /// This allows inspecting methods and types.
+    pub async fn get_method_descriptor(
+        &mut self,
+        service_name: &str,
+        method_name: &str,
+    ) -> Result<MethodDescriptor, GetMethodDescriptorError> {
+        let fd_set = self
+            .reflection_client
+            .file_descriptor_set_by_symbol(service_name)
+            .await?;
+
+        let pool = DescriptorPool::from_file_descriptor_set(fd_set)?;
+
+        let service = pool
+            .get_service_by_name(service_name)
+            .ok_or_else(|| GetMethodDescriptorError::ServiceNotFound(service_name.to_string()))?;
+
+        service
+            .methods()
+            .find(|m| m.name() == method_name)
+            .ok_or_else(|| GetMethodDescriptorError::MethodNotFound(method_name.to_string()))
+    }
+
+    /// Fetches the descriptor for a specific message using reflection.
+    pub async fn get_message_descriptor(
+        &mut self,
+        message_name: &str,
+    ) -> Result<MessageDescriptor, GetMessageDescriptorError> {
+        let fd_set = self
+            .reflection_client
+            .file_descriptor_set_by_symbol(message_name)
+            .await?;
+
+        let pool = DescriptorPool::from_file_descriptor_set(fd_set)?;
+
+        pool.get_message_by_name(message_name)
+            .ok_or_else(|| GetMessageDescriptorError::MessageNotFound(message_name.to_string()))
+    }
+
     pub async fn dynamic(
         &mut self,
         request: DynamicRequest,
-    ) -> Result<DynamicResponse, DynamicRequestError> {
+    ) -> Result<DynamicResponse, DynamicCallError> {
         let pool = match request.file_descriptor_set {
             Some(bytes) => DescriptorPool::decode(bytes.as_slice())?,
             // If no proto-set file is passed, we'll try to reach the server reflection service
@@ -124,12 +229,12 @@ where
 
         let service = pool
             .get_service_by_name(&request.service)
-            .ok_or_else(|| DynamicRequestError::ServiceNotFound(request.service))?;
+            .ok_or_else(|| DynamicCallError::ServiceNotFound(request.service))?;
 
         let method = service
             .methods()
             .find(|m| m.name() == request.method)
-            .ok_or_else(|| DynamicRequestError::MethodNotFound(request.method))?;
+            .ok_or_else(|| DynamicCallError::MethodNotFound(request.method))?;
 
         match (method.is_client_streaming(), method.is_server_streaming()) {
             (false, false) => {
@@ -151,8 +256,8 @@ where
                 }
             }
             (true, false) => {
-                let input_stream = json_array_to_stream(request.body)
-                    .map_err(DynamicRequestError::InvalidInput)?;
+                let input_stream =
+                    json_array_to_stream(request.body).map_err(DynamicCallError::InvalidInput)?;
                 let result = self
                     .grpc_client
                     .client_streaming(method, input_stream, request.headers)
@@ -161,8 +266,8 @@ where
             }
 
             (true, true) => {
-                let input_stream = json_array_to_stream(request.body)
-                    .map_err(DynamicRequestError::InvalidInput)?;
+                let input_stream =
+                    json_array_to_stream(request.body).map_err(DynamicCallError::InvalidInput)?;
                 match self
                     .grpc_client
                     .bidirectional_streaming(method, input_stream, request.headers)

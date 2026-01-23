@@ -204,6 +204,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b05b61dc5112cbb17e4b6cd61790d9845d13888356391624cbe7e41efeac1e75"
 
 [[package]]
+name = "colored"
+version = "3.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "faf9468729b8cbcea668e36183cb69d317348c2e08e994829fb56ebfdfbaac34"
+dependencies = [
+ "windows-sys 0.61.2",
+]
+
+[[package]]
 name = "echo-service"
 version = "0.0.0"
 dependencies = [
@@ -327,10 +336,11 @@ dependencies = [
 
 [[package]]
 name = "granc"
-version = "0.3.1"
+version = "0.4.0"
 dependencies = [
  "clap",
- "granc_core 0.2.4",
+ "colored",
+ "granc_core",
  "serde_json",
  "tokio",
  "tonic",
@@ -345,27 +355,7 @@ dependencies = [
 
 [[package]]
 name = "granc_core"
-version = "0.2.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2b70761ae61e50a3da701f80dec0a5768e43420895922e233894865ce3969cea"
-dependencies = [
- "futures-util",
- "http",
- "http-body",
- "prost",
- "prost-reflect",
- "prost-types",
- "serde_json",
- "thiserror",
- "tokio",
- "tokio-stream",
- "tonic",
- "tonic-prost",
-]
-
-[[package]]
-name = "granc_core"
-version = "0.3.1"
+version = "0.3.2"
 dependencies = [
  "echo-service",
  "futures-util",

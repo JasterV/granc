@@ -16,6 +16,7 @@ use super::generated::reflection_v1::{
     server_reflection_response::MessageResponse,
 };
 use crate::BoxError;
+use futures_util::stream::once;
 use http_body::Body as HttpBody;
 use prost::Message;
 use prost_types::{FileDescriptorProto, FileDescriptorSet};
@@ -119,6 +120,44 @@ where
         };
 
         Ok(fd_set)
+    }
+
+    /// Lists all services exposed by the server.
+    pub async fn list_services(&mut self) -> Result<Vec<String>, ReflectionResolveError> {
+        let req = ServerReflectionRequest {
+            host: EMPTY_HOST.to_string(),
+            message_request: Some(MessageRequest::ListServices(String::new())),
+        };
+
+        let mut response_stream = self
+            .client
+            .server_reflection_info(once(async { req }))
+            .await
+            .map_err(ReflectionResolveError::ServerStreamInitFailed)?
+            .into_inner();
+
+        let response = response_stream
+            .message()
+            .await
+            .map_err(ReflectionResolveError::ServerStreamFailure)?
+            .ok_or(ReflectionResolveError::StreamClosed)?;
+
+        match response.message_response {
+            Some(MessageResponse::ListServicesResponse(resp)) => {
+                let services = resp.service.into_iter().map(|s| s.name).collect();
+                Ok(services)
+            }
+            Some(MessageResponse::ErrorResponse(e)) => Err(ReflectionResolveError::ServerError {
+                code: e.error_code,
+                message: e.error_message,
+            }),
+            Some(other) => Err(ReflectionResolveError::UnexpectedResponseType(format!(
+                "{other:?}",
+            ))),
+            None => Err(ReflectionResolveError::UnexpectedResponseType(
+                "Empty Message".into(),
+            )),
+        }
     }
 }
 

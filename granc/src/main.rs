@@ -5,20 +5,138 @@
 //! 1. **Initialization**: Parses command-line arguments using [`cli::Cli`].
 //! 2. **Connection**: Establishes a TCP connection to the target server via `granc_core`.
 //! 3. **Execution**: Delegates the request processing to the `GrancClient`.
-//! 4. **Presentation**: Formats and prints the resulting JSON or error status to standard output/error.
+//! 4. **Presentation**: Formats and prints the resulting data or error status to standard output/error.
 
 mod cli;
+mod formatter;
 
 use clap::Parser;
-use cli::Cli;
+use cli::{Cli, Commands, DescribeCommands};
+use formatter::ExpandedMessage;
+use formatter::FormattedString;
 use granc_core::client::{DynamicRequest, DynamicResponse, GrancClient};
 use std::process;
 
 #[tokio::main]
 async fn main() {
     let args = Cli::parse();
+    // The URL is now a global argument, available for all commands
+    let url = args.url;
 
-    let file_descriptor_set = match args.file_descriptor_set.map(std::fs::read).transpose() {
+    match args.command {
+        Commands::Call {
+            endpoint,
+            body,
+            headers,
+            file_descriptor_set,
+        } => {
+            let (service, method) = endpoint;
+            run_call(url, service, method, body, headers, file_descriptor_set).await;
+        }
+        Commands::List { sub } => match sub {
+            cli::ListCommands::Services => list_services(&url).await,
+        },
+        Commands::Describe { sub } => match sub {
+            DescribeCommands::Service { service } => describe_service(&url, &service).await,
+            DescribeCommands::Method { method } => {
+                let (service, method_name) = method;
+                describe_method(&url, &service, &method_name).await
+            }
+            DescribeCommands::Message { message, recursive } => {
+                describe_message(&url, &message, recursive).await
+            }
+        },
+    }
+}
+
+async fn connect_or_exit(url: &str) -> GrancClient {
+    match GrancClient::connect(url).await {
+        Ok(client) => client,
+        Err(err) => {
+            eprintln!("Error connecting to {}: {}", url, err);
+            process::exit(1);
+        }
+    }
+}
+
+async fn list_services(url: &str) {
+    let mut client = connect_or_exit(url).await;
+
+    match client.list_services().await {
+        Ok(services) => {
+            println!("Available Services:");
+            for svc in services {
+                println!("  - {}", svc);
+            }
+        }
+        Err(e) => {
+            eprintln!("Failed to list services: {}", e);
+            process::exit(1);
+        }
+    }
+}
+
+async fn describe_service(url: &str, service_name: &str) {
+    let mut client = connect_or_exit(url).await;
+
+    match client.get_service_descriptor(service_name).await {
+        Ok(descriptor) => println!("{}", FormattedString::from(descriptor)),
+        Err(e) => {
+            eprintln!("Failed to inspect service '{}': '{}'", service_name, e);
+            process::exit(1);
+        }
+    }
+}
+
+async fn describe_method(url: &str, service_name: &str, method_name: &str) {
+    let mut client = connect_or_exit(url).await;
+
+    let descriptor = match client
+        .get_method_descriptor(service_name, method_name)
+        .await
+    {
+        Ok(desc) => desc,
+        Err(e) => {
+            eprintln!(
+                "Failed to describe method '{}/{}': {}",
+                service_name, method_name, e
+            );
+            process::exit(1);
+        }
+    };
+
+    println!("{}", FormattedString::from(descriptor));
+}
+
+async fn describe_message(url: &str, message_name: &str, recursive: bool) {
+    let mut client = connect_or_exit(url).await;
+
+    match client.get_message_descriptor(message_name).await {
+        Ok(descriptor) => {
+            if recursive {
+                // ExpandedMessage triggers the recursive printing logic from printer.rs
+                println!("{}", FormattedString::from(ExpandedMessage(descriptor)));
+            } else {
+                // Direct Formatted::from prints only the first level
+                println!("{}", FormattedString::from(descriptor));
+            }
+        }
+        Err(e) => {
+            eprintln!("Failed to inspect message '{}': {}", message_name, e);
+            process::exit(1);
+        }
+    }
+}
+
+async fn run_call(
+    url: String,
+    service: String,
+    method: String,
+    body: serde_json::Value,
+    headers: Vec<(String, String)>,
+    file_descriptor_set: Option<std::path::PathBuf>,
+) {
+    let file_descriptor_set = match file_descriptor_set.map(std::fs::read).transpose() {
         Ok(fd) => fd,
         Err(err) => {
             eprintln!("Error reading file descriptor set: '{err}'");
@@ -26,29 +144,23 @@ async fn main() {
         }
     };
 
-    let (service, method) = args.endpoint;
-
     let request = DynamicRequest {
         file_descriptor_set,
-        body: args.body,
-        headers: args.headers,
+        body,
+        headers,
         service,
         method,
     };
 
-    let mut client = match GrancClient::connect(&args.url).await {
-        Ok(client) => client,
-        Err(err) => {
-            eprintln!("Error: {err}");
-            process::exit(1);
-        }
-    };
+    let mut client = connect_or_exit(&url).await;
 
     match client.dynamic(request).await {
-        Ok(DynamicResponse::Unary(Ok(value))) => print_json(&value),
-        Ok(DynamicResponse::Unary(Err(status))) => print_status(&status),
+        Ok(DynamicResponse::Unary(Ok(value))) => println!("{}", FormattedString::from(value)),
+        Ok(DynamicResponse::Unary(Err(status))) => println!("{}", FormattedString::from(status)),
         Ok(DynamicResponse::Streaming(Ok(values))) => print_stream(&values),
-        Ok(DynamicResponse::Streaming(Err(status))) => print_status(&status),
+        Ok(DynamicResponse::Streaming(Err(status))) => {
+            println!("{}", FormattedString::from(status))
+        }
         Err(err) => {
             eprintln!("Error: {err}");
             process::exit(1);
@@ -56,26 +168,11 @@ async fn main() {
     }
 }
 
-fn print_json(val: &serde_json::Value) {
-    println!(
-        "{}",
-        serde_json::to_string_pretty(val).unwrap_or_else(|_| val.to_string())
-    );
-}
-
-fn print_status(status: &tonic::Status) {
-    eprintln!(
-        "gRPC Failed: code={:?} message={:?}",
-        status.code(),
-        status.message()
-    );
-}
-
 fn print_stream(stream: &[Result<serde_json::Value, tonic::Status>]) {
     for elem in stream {
         match elem {
-            Ok(val) => print_json(val),
-            Err(status) => print_status(status),
+            Ok(val) => println!("{}", FormattedString::from(val.clone())),
+            Err(status) => println!("{}", FormattedString::from(status.clone())),
         }
     }
 }
