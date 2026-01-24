@@ -6,8 +6,6 @@ use tonic_reflection::server::v1::ServerReflectionServer;
 
 mod echo_service_impl;
 
-/// Sets up a GrancClient connected to a standalone Reflection Service.
-/// This service is configured with the `echo-service` descriptors.
 fn reflection_service()
 -> ServerReflectionServer<impl tonic_reflection::server::v1::ServerReflection> {
     tonic_reflection::server::Builder::configure()
