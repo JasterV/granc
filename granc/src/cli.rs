@@ -5,25 +5,52 @@
 //! It is responsible for parsing user input and performing validation (e.g., ensuring headers are `key:value`);
 use std::path::PathBuf;
 
-use clap::Parser;
+use clap::{Parser, Subcommand};
 
 #[derive(Parser)]
 #[command(name = "granc", version, about = "Dynamic gRPC CLI")]
 pub struct Cli {
-    #[arg(long, help = "Path to the descriptor set (.bin)")]
-    pub file_descriptor_set: Option<PathBuf>,
-
-    #[arg(long, help = "JSON body (Object for Unary, Array for Streaming)", value_parser = parse_body)]
-    pub body: serde_json::Value,
-
-    #[arg(short = 'H', long = "header", value_parser = parse_header)]
-    pub headers: Vec<(String, String)>,
-
-    #[arg(help = "Server URL (http://host:port)")]
+    /// The server URL to connect to (e.g. http://localhost:50051)
     pub url: String,
 
-    #[arg(help = "Endpoint (package.Service/Method)", value_parser = parse_endpoint)]
-    pub endpoint: (String, String),
+    #[command(subcommand)]
+    pub command: Commands,
+}
+#[derive(Subcommand)]
+pub enum Commands {
+    /// Perform a gRPC call to a server
+    ///
+    /// This command connects to a gRPC server and executes a method using a JSON body.
+    ///
+    /// ## Examples:
+    ///
+    /// ```bash
+    /// granc call http://localhost:50051 my.pkg.Service/Method --body '{"key": "value"}'
+    /// ```
+    Call {
+        /// Endpoint (package.Service/Method)
+        #[arg(value_parser = parse_endpoint)]
+        endpoint: (String, String),
+        /// "JSON body (Object for Unary, Array for Streaming)"
+        #[arg(long, value_parser = parse_body)]
+        body: serde_json::Value,
+
+        #[arg(short = 'H', long = "header", value_parser = parse_header)]
+        headers: Vec<(String, String)>,
+
+        /// Path to the descriptor set (.bin)
+        #[arg(long)]
+        file_descriptor_set: Option<PathBuf>,
+    },
+
+    /// List available services
+    List,
+
+    /// Describe a service, message or enum passing the full path
+    Describe {
+        /// Fully qualified name (e.g. my.package.Service)
+        symbol: String,
+    },
 }
 
 fn parse_endpoint(value: &str) -> Result<(String, String), String> {

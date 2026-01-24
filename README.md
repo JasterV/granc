@@ -20,25 +20,14 @@ It is heavily inspired by tools like `grpcurl` but built to leverage the safety 
 * **Server Reflection**: Can fetch schemas directly from the server, removing the need to pass a local file descriptor set file (`.bin` or `.pb`).
 * **Metadata Support**: Easily attach custom headers (authorization, tracing) to your requests.
 * **Fast Fail Validation**: Validates your JSON *before* hitting the network.
+* **Introspection Tools**: Commands to list services and describe services/messages.
 * **Zero Compilation Dependencies**: Does not require generating Rust code for your protos. Just point to a descriptor file.
 * **Tonic 0.14**: Built on the latest stable Rust gRPC stack.
 
 ## 📦 Installation
 
-### From Crates.io
-
 ```bash
-cargo install granc
-```
-
-### From Source
-
-Ensure you have Rust and Cargo installed.
-
-```bash
-git clone https://github.com/JasterV/granc
-cd granc
-cargo install --path .
+cargo install --locked granc
 ```
 
 ## 🛠️ Prerequisites
@@ -68,69 +57,79 @@ protoc \
 **Syntax:**
 
 ```bash
-granc [OPTIONS] <URL> <ENDPOINT>
+granc <URL> <COMMAND> [ARGS]
 ```
 
-### Arguments
+### Global Arguments
 
 | Argument | Description | Required |
 | --- | --- | --- |
-| `<URL>` | Server address (e.g., `http://[::1]:50051`). | **Yes** |
-| `<ENDPOINT>` | Fully qualified method name (e.g., `my.package.Service/Method`). | **Yes** |
+| `<URL>` | Server address (e.g., `http://[::1]:50051`). Must be the first argument. | **Yes** |
 
-### Options
+### Commands
 
-| Flag | Short | Description | Required |
-| --- | --- | --- | --- |
-| `--proto-set` |  | Path to the binary FileDescriptorSet (`.bin`). | **No** |
-| `--body` |  | The request body in JSON format. | **Yes** |
-| `--header` | `-H` | Custom header `key:value`. Can be used multiple times. | No |
+#### 1. `call` (Make Requests)
 
-### Automatic Server Reflection
-
-If you omit the `--proto-set` flag, Granc will automatically attempt to connect to the server's reflection service to download the necessary schemas.
+Performs a gRPC call using a JSON body.
 
 ```bash
-# Using Reflection (no descriptor file needed)
-granc \
-  --body '{"name": "Ferris"}' \
-  http://localhost:50051 \
-  helloworld.Greeter/SayHello
+granc http://localhost:50051 call <ENDPOINT> --body <JSON> [OPTIONS]
 ```
 
-This requires the server to have the [`grpc.reflection.v1`](https://github.com/grpc/grpc-proto/blob/master/grpc/reflection/v1/reflection.proto) service enabled.
+| Argument/Flag | Description | Required |
+| --- | --- | --- |
+| `<ENDPOINT>` | Fully qualified method name (e.g., `my.package.Service/Method`). | **Yes** |
+| `--body` | The request body in JSON format. Object `{}` for unary, Array `[]` for streaming. | **Yes** |
+| `--header`, `-H` | Custom header `key:value`. Can be used multiple times. | No |
+| `--file-descriptor-set` | Path to the binary FileDescriptorSet (`.bin`) if not using reflection. | No |
 
-### JSON Body Format
+##### JSON Body Format
 
 * **Unary / Server Streaming**: Provide a single JSON object `{ ... }`.
 * **Client / Bidirectional Streaming**: Provide a JSON array of objects `[ { ... }, { ... } ]`.
 
-### Examples
+##### Automatic Server Reflection
 
-**1. Unary Call (using local descriptor)**
+If you omit the `--file-descriptor-set` flag, Granc will automatically attempt to connect to the server's reflection service to download the necessary schemas.
 
 ```bash
-granc \
-  --proto-set ./descriptor.bin \
-  --body '{"name": "Ferris"}' \
-  http://localhost:50051 \
-  helloworld.Greeter/SayHello
+granc http://localhost:50051 call --body '{"name": "Ferris"}' helloworld.Greeter/SayHello
 ```
 
-**2. Bidirectional Streaming (Chat)**
+This requires the server to have the [`grpc.reflection.v1`](https://github.com/grpc/grpc-proto/blob/master/grpc/reflection/v1/reflection.proto) service enabled.
+
+#### 2. `list` (Service Discovery) (Server reflection required)
+
+Lists all services exposed by the server.
 
 ```bash
-granc \
-  --body '[{"text": "Hello"}, {"text": "How are you?"}]' \
-  -H "authorization: Bearer token123" \
-  http://localhost:50051 \
-  chat.ChatService/StreamMessages
+granc http://localhost:50051 list
+```
+
+#### 3. `describe` (Introspection) (Server reflection required)
+
+Inspects services, messages or enums and prints their Protobuf definition.
+
+**Describe Service:**
+
+Describe in detail all methods of a service.
+
+```bash
+granc http://localhost:50051 describe my.package.Greeter
+```
+
+**Describe Message:**
+
+Shows the fields of a specific message type.
+
+```bash
+granc http://localhost:50051 describe my.package.HelloRequest
 ```
 
 ## 🔮 Roadmap
 
 * **Interactive Mode**: A REPL for streaming requests interactively.
-* **Pretty Printing**: Enhanced colored output for JSON responses.
+* **Pretty Printing JSON**: Enhanced colored output for JSON responses.
 * **TLS Support**: Configurable root certificates and client identity.
 
 ## 🧩 Using as a Library
