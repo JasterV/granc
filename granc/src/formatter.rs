@@ -151,9 +151,7 @@ impl From<MessageDescriptor> for FormattedString {
         ));
 
         for field in message.fields() {
-            let label = if field.is_map() {
-                "".to_string()
-            } else if field.is_list() {
+            let label = if field.is_list() {
                 format!("{} ", "repeated".cyan())
             } else {
                 "".to_string()
