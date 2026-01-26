@@ -1,7 +1,11 @@
+use std::fmt::Display;
+
 use colored::*;
 use granc_core::{
-    client::{ClientConnectError, DynamicCallError, GetDescriptorError, ListServicesError},
-    prost_reflect::{EnumDescriptor, Kind, MessageDescriptor, MethodDescriptor, ServiceDescriptor},
+    client::with_server_reflection::{ClientConnectError, DynamicCallError, GetDescriptorError},
+    prost_reflect::{
+        self, EnumDescriptor, Kind, MessageDescriptor, MethodDescriptor, ServiceDescriptor,
+    },
 };
 use tonic::Status;
 
@@ -11,6 +15,8 @@ use tonic::Status;
 pub struct FormattedString(pub String);
 
 pub struct ServiceList(pub Vec<String>);
+
+pub struct GenericError<T: Display>(pub &'static str, pub T);
 
 impl std::fmt::Display for FormattedString {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -37,6 +43,16 @@ impl From<Status> for FormattedString {
     }
 }
 
+impl From<prost_reflect::DescriptorError> for FormattedString {
+    fn from(err: prost_reflect::DescriptorError) -> Self {
+        FormattedString(format!(
+            "{}\n\n'{}'",
+            "Failed to parse file descriptor:".red().bold(),
+            err
+        ))
+    }
+}
+
 impl From<std::io::Error> for FormattedString {
     fn from(err: std::io::Error) -> Self {
         FormattedString(format!(
@@ -47,19 +63,15 @@ impl From<std::io::Error> for FormattedString {
     }
 }
 
-impl From<ClientConnectError> for FormattedString {
-    fn from(err: ClientConnectError) -> Self {
-        FormattedString(format!("{}\n\n'{}'", "Connection Error:".red().bold(), err))
+impl<T: Display> From<GenericError<T>> for FormattedString {
+    fn from(GenericError(msg, err): GenericError<T>) -> Self {
+        FormattedString(format!("{}:\n\n'{}'", msg.red().bold(), err))
     }
 }
 
-impl From<ListServicesError> for FormattedString {
-    fn from(err: ListServicesError) -> Self {
-        FormattedString(format!(
-            "{}\n\n'{}'",
-            "Failed to list services:".red().bold(),
-            err
-        ))
+impl From<ClientConnectError> for FormattedString {
+    fn from(err: ClientConnectError) -> Self {
+        FormattedString(format!("{}\n\n'{}'", "Connection Error:".red().bold(), err))
     }
 }
 

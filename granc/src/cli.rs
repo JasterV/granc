@@ -13,6 +13,10 @@ pub struct Cli {
     /// The server URL to connect to (e.g. http://localhost:50051)
     pub url: String,
 
+    /// Path to the descriptor set (.bin)
+    #[arg(long)]
+    pub file_descriptor_set: Option<PathBuf>,
+
     #[command(subcommand)]
     pub command: Commands,
 }
@@ -37,10 +41,6 @@ pub enum Commands {
 
         #[arg(short = 'H', long = "header", value_parser = parse_header)]
         headers: Vec<(String, String)>,
-
-        /// Path to the descriptor set (.bin)
-        #[arg(long)]
-        file_descriptor_set: Option<PathBuf>,
     },
 
     /// List available services

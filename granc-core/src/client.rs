@@ -4,6 +4,11 @@ pub mod with_server_reflection;
 use prost_reflect::{EnumDescriptor, MessageDescriptor, ServiceDescriptor};
 use std::fmt::Debug;
 
+#[derive(Clone, Debug)]
+pub struct GrancClient<T> {
+    state: T,
+}
+
 /// A request object encapsulating all necessary information to perform a dynamic gRPC call.
 pub struct DynamicRequest {
     /// The JSON body of the request.
@@ -55,20 +60,4 @@ impl Descriptor {
             _ => None,
         }
     }
-}
-
-#[derive(Clone, Debug)]
-pub struct GrancClient<T: sealed::Sealed + Clone> {
-    state: T,
-}
-
-mod sealed {
-    use crate::client::{
-        with_file_descriptor::WithFileDescriptor, with_server_reflection::WithServerReflection,
-    };
-
-    pub trait Sealed {}
-
-    impl<S> Sealed for WithFileDescriptor<S> {}
-    impl<S> Sealed for WithServerReflection<S> {}
 }

@@ -8,6 +8,7 @@ use http_body::Body as HttpBody;
 use prost_reflect::DescriptorPool;
 use std::fmt::Debug;
 use tokio_stream::StreamExt;
+use tonic::transport::Channel;
 
 #[derive(Debug, thiserror::Error)]
 pub enum DynamicCallError {
@@ -25,7 +26,7 @@ pub enum DynamicCallError {
 }
 
 #[derive(Debug, Clone)]
-pub struct WithFileDescriptor<S> {
+pub struct WithFileDescriptor<S = Channel> {
     grpc_client: GrpcClient<S>,
     pool: DescriptorPool,
 }

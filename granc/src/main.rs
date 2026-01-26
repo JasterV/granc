@@ -13,7 +13,10 @@ mod formatter;
 use clap::Parser;
 use cli::{Cli, Commands};
 use formatter::FormattedString;
-use granc_core::client::{Descriptor, DynamicRequest, DynamicResponse, GrancClient};
+use granc_core::client::{
+    Descriptor, DynamicRequest, DynamicResponse, GrancClient,
+    with_server_reflection::WithServerReflection,
+};
 use std::process;
 
 use crate::formatter::ServiceList;
@@ -23,13 +26,13 @@ async fn main() {
     let args = Cli::parse();
     // The URL is now a global argument, available for all commands
     let url = args.url;
+    let file_descriptor_set = args.file_descriptor_set;
 
     match args.command {
         Commands::Call {
             endpoint,
             body,
             headers,
-            file_descriptor_set,
         } => {
             let (service, method) = endpoint;
             run_call(url, service, method, body, headers, file_descriptor_set).await;
@@ -39,7 +42,7 @@ async fn main() {
     }
 }
 
-async fn connect_or_exit(url: &str) -> GrancClient {
+async fn connect_or_exit(url: &str) -> GrancClient<WithServerReflection> {
     match GrancClient::connect(url).await {
         Ok(client) => client,
         Err(err) => {

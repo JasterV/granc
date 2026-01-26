@@ -47,7 +47,7 @@ pub enum GetDescriptorError {
 }
 
 #[derive(Debug, Clone)]
-pub struct WithServerReflection<S> {
+pub struct WithServerReflection<S = Channel> {
     reflection_client: ReflectionClient<S>,
     grpc_client: GrpcClient<S>,
 }
