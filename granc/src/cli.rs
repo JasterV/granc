@@ -20,17 +20,12 @@ pub struct Cli {
     #[command(subcommand)]
     pub command: Commands,
 }
+
 #[derive(Subcommand)]
 pub enum Commands {
     /// Perform a gRPC call to a server
     ///
     /// This command connects to a gRPC server and executes a method using a JSON body.
-    ///
-    /// ## Examples:
-    ///
-    /// ```bash
-    /// granc call http://localhost:50051 my.pkg.Service/Method --body '{"key": "value"}'
-    /// ```
     Call {
         /// Endpoint (package.Service/Method)
         #[arg(value_parser = parse_endpoint)]

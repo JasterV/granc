@@ -1,13 +1,12 @@
-use std::fmt::Display;
-
 use colored::*;
 use granc_core::{
-    client::with_server_reflection::{ClientConnectError, DynamicCallError, GetDescriptorError},
+    client::{with_file_descriptor, with_server_reflection},
     prost_reflect::{
         self, EnumDescriptor, Kind, MessageDescriptor, MethodDescriptor, ServiceDescriptor,
     },
+    tonic::Status,
 };
-use tonic::Status;
+use std::fmt::Display;
 
 /// A wrapper struct for a formatted, colored string.
 ///
@@ -43,6 +42,20 @@ impl From<Status> for FormattedString {
     }
 }
 
+// Error from Reflection-based calls
+impl From<with_server_reflection::DynamicCallError> for FormattedString {
+    fn from(err: with_server_reflection::DynamicCallError) -> Self {
+        FormattedString(format!("{}\n\n'{}'", "Call Failed:".red().bold(), err))
+    }
+}
+
+// Error from FileDescriptor-based calls
+impl From<with_file_descriptor::DynamicCallError> for FormattedString {
+    fn from(err: with_file_descriptor::DynamicCallError) -> Self {
+        FormattedString(format!("{}\n\n'{}'", "Call Failed:".red().bold(), err))
+    }
+}
+
 impl From<prost_reflect::DescriptorError> for FormattedString {
     fn from(err: prost_reflect::DescriptorError) -> Self {
         FormattedString(format!(
@@ -69,25 +82,19 @@ impl<T: Display> From<GenericError<T>> for FormattedString {
     }
 }
 
-impl From<ClientConnectError> for FormattedString {
-    fn from(err: ClientConnectError) -> Self {
+impl From<with_server_reflection::ClientConnectError> for FormattedString {
+    fn from(err: with_server_reflection::ClientConnectError) -> Self {
         FormattedString(format!("{}\n\n'{}'", "Connection Error:".red().bold(), err))
     }
 }
 
-impl From<GetDescriptorError> for FormattedString {
-    fn from(err: GetDescriptorError) -> Self {
+impl From<with_server_reflection::GetDescriptorError> for FormattedString {
+    fn from(err: with_server_reflection::GetDescriptorError) -> Self {
         FormattedString(format!(
             "{}\n\n'{}'",
             "Symbol Lookup Failed:".red().bold(),
             err
         ))
-    }
-}
-
-impl From<DynamicCallError> for FormattedString {
-    fn from(err: DynamicCallError) -> Self {
-        FormattedString(format!("{}\n\n'{}'", "Call Failed:".red().bold(), err))
     }
 }
 
