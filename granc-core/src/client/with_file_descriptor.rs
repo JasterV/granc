@@ -1,13 +1,12 @@
-use super::GrancClient;
-use crate::grpc::client::GrpcRequestError;
+use super::{Descriptor, DynamicRequest, DynamicResponse, GrancClient};
 use crate::{
     BoxError,
-    client::model::{Descriptor, DynamicRequest, DynamicResponse},
-    grpc::client::GrpcClient,
+    grpc::client::{GrpcClient, GrpcRequestError},
 };
 use futures_util::Stream;
 use http_body::Body as HttpBody;
 use prost_reflect::DescriptorPool;
+use std::fmt::Debug;
 use tokio_stream::StreamExt;
 
 #[derive(Debug, thiserror::Error)]
@@ -25,12 +24,16 @@ pub enum DynamicCallError {
     GrpcRequestError(#[from] GrpcRequestError),
 }
 
+#[derive(Debug, Clone)]
 pub struct WithFileDescriptor<S> {
     grpc_client: GrpcClient<S>,
     pool: DescriptorPool,
 }
 
-impl<S> GrancClient<WithFileDescriptor<S>> {
+impl<S> GrancClient<WithFileDescriptor<S>>
+where
+    S: Clone,
+{
     pub(crate) fn new(grpc_client: GrpcClient<S>, pool: DescriptorPool) -> Self {
         Self {
             state: WithFileDescriptor {

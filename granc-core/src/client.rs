@@ -1,55 +1,74 @@
-//! # Granc Client
-//!
-//! This module implements the high-level logic for executing dynamic gRPC requests
-//! and offers support for reflection operations if the server supports it.
-//!
-//! The [`GrancClient`] is the primary entry point for consumers of this library.
-//! It abstracts away the complexity of connection management, schema resolution (reflection vs. file descriptors),
-//! and generic gRPC transport.
-//!
-//! ## Example Usage
-//!
-//! ```rust,no_run
-//! use granc_core::client::{GrancClient, DynamicRequest};
-//! use serde_json::json;
-//!
-//! # async fn run() -> Result<(), Box<dyn std::error::Error>> {
-//! // 1. Connect to the server
-//! let mut client = GrancClient::connect("http://localhost:50051").await?;
-//!
-//! // 2. Prepare the request (using server reflection)
-//! let request = DynamicRequest {
-//!     service: "helloworld.Greeter".to_string(),
-//!     method: "SayHello".to_string(),
-//!     body: json!({ "name": "Ferris" }),
-//!     headers: vec![],
-//!     file_descriptor_set: None,
-//! };
-//!
-//! // 3. Execute the call
-//! let response = client.dynamic(request).await?;
-//! println!("Response: {:?}", response);
-//! # Ok(())
-//! # }
-//! ```
-
-mod model;
 pub mod with_file_descriptor;
 pub mod with_server_reflection;
 
-pub use model::{Descriptor, DynamicRequest, DynamicResponse};
+use prost_reflect::{EnumDescriptor, MessageDescriptor, ServiceDescriptor};
+use std::fmt::Debug;
 
-pub struct GrancClient<T: locked::Locked> {
+/// A request object encapsulating all necessary information to perform a dynamic gRPC call.
+pub struct DynamicRequest {
+    /// The JSON body of the request.
+    /// - For Unary/ServerStreaming: An Object `{}`.
+    /// - For ClientStreaming/Bidirectional: An Array of Objects `[{}]`.
+    pub body: serde_json::Value,
+    /// Custom gRPC metadata (headers) to attach to the request.
+    pub headers: Vec<(String, String)>,
+    /// The fully qualified name of the service (e.g., `my.package.Service`).
+    pub service: String,
+    /// The name of the method to call (e.g., `SayHello`).
+    pub method: String,
+}
+
+/// The result of a dynamic gRPC call.
+pub enum DynamicResponse {
+    /// A single response message (for Unary and Client Streaming calls).
+    Unary(Result<serde_json::Value, tonic::Status>),
+    /// A stream of response messages (for Server Streaming and Bidirectional calls).
+    Streaming(Result<Vec<Result<serde_json::Value, tonic::Status>>, tonic::Status>),
+}
+
+/// A file descriptor of either a message, service or enum
+#[derive(Debug, Clone)]
+pub enum Descriptor {
+    MessageDescriptor(MessageDescriptor),
+    ServiceDescriptor(ServiceDescriptor),
+    EnumDescriptor(EnumDescriptor),
+}
+
+impl Descriptor {
+    pub fn message_descriptor(&self) -> Option<&MessageDescriptor> {
+        match self {
+            Descriptor::MessageDescriptor(message_descriptor) => Some(message_descriptor),
+            _ => None,
+        }
+    }
+
+    pub fn service_descriptor(&self) -> Option<&ServiceDescriptor> {
+        match self {
+            Descriptor::ServiceDescriptor(service_descriptor) => Some(service_descriptor),
+            _ => None,
+        }
+    }
+
+    pub fn enum_descriptor(&self) -> Option<&EnumDescriptor> {
+        match self {
+            Descriptor::EnumDescriptor(enum_descriptor) => Some(enum_descriptor),
+            _ => None,
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct GrancClient<T: sealed::Sealed + Clone> {
     state: T,
 }
 
-mod locked {
+mod sealed {
     use crate::client::{
         with_file_descriptor::WithFileDescriptor, with_server_reflection::WithServerReflection,
     };
 
-    pub trait Locked {}
+    pub trait Sealed {}
 
-    impl<S> Locked for WithFileDescriptor<S> {}
-    impl<S> Locked for WithServerReflection<S> {}
+    impl<S> Sealed for WithFileDescriptor<S> {}
+    impl<S> Sealed for WithServerReflection<S> {}
 }

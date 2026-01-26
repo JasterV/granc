@@ -1,7 +1,5 @@
-use echo_service::EchoServiceServer;
-use echo_service::FILE_DESCRIPTOR_SET;
+use echo_service::{EchoServiceServer, FILE_DESCRIPTOR_SET};
 use echo_service_impl::EchoServiceImpl;
-use granc_core::client::with_file_descriptor;
 use granc_core::client::{DynamicRequest, DynamicResponse, GrancClient};
 use tonic_reflection::server::v1::ServerReflectionServer;
 
@@ -26,7 +24,9 @@ async fn test_unary() {
         method: "UnaryEcho".to_string(),
     };
 
-    let mut client = GrancClient::from_service(EchoServiceServer::new(EchoServiceImpl));
+    let mut client = GrancClient::from_service(EchoServiceServer::new(EchoServiceImpl))
+        .with_file_descriptor(FILE_DESCRIPTOR_SET.to_vec())
+        .unwrap();
 
     let res = client.dynamic(request).await.unwrap();
 
@@ -51,7 +51,8 @@ async fn test_server_streaming() {
     };
 
     let mut client = GrancClient::from_service(EchoServiceServer::new(EchoServiceImpl))
-        .with_file_descriptor(FILE_DESCRIPTOR_SET.to_vec());
+        .with_file_descriptor(FILE_DESCRIPTOR_SET.to_vec())
+        .unwrap();
 
     let res = client.dynamic(request).await.unwrap();
 
@@ -87,9 +88,10 @@ async fn test_client_streaming() {
     };
 
     let mut client = GrancClient::from_service(EchoServiceServer::new(EchoServiceImpl))
-        .with_file_descriptor(FILE_DESCRIPTOR_SET.to_vec());
+        .with_file_descriptor(FILE_DESCRIPTOR_SET.to_vec())
+        .unwrap();
 
-    let res = client.dynamic(request).unwrap();
+    let res = client.dynamic(request).await.unwrap();
 
     match res {
         DynamicResponse::Unary(Ok(value)) => {
@@ -110,14 +112,15 @@ async fn test_bidirectional_streaming() {
     ]);
 
     let request = DynamicRequest {
-        file_descriptor_set: Some(FILE_DESCRIPTOR_SET.to_vec()),
         body: payload.clone(),
         headers: vec![],
         service: "echo.EchoService".to_string(),
         method: "BidirectionalEcho".to_string(),
     };
 
-    let mut client = GrancClient::from_service(EchoServiceServer::new(EchoServiceImpl));
+    let mut client = GrancClient::from_service(EchoServiceServer::new(EchoServiceImpl))
+        .with_file_descriptor(FILE_DESCRIPTOR_SET.to_vec())
+        .unwrap();
 
     let res = client.dynamic(request).await.unwrap();
 
@@ -208,6 +211,6 @@ async fn test_get_descriptor_not_found() {
 
     assert!(matches!(
         err,
-        granc_core::client::GetDescriptorError::NotFound(_)
+        granc_core::client::with_server_reflection::GetDescriptorError::NotFound(_)
     ));
 }

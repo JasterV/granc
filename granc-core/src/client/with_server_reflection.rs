@@ -1,16 +1,16 @@
-use super::GrancClient;
+use super::{
+    Descriptor, DynamicRequest, DynamicResponse, GrancClient,
+    with_file_descriptor::WithFileDescriptor,
+};
 use crate::{
     BoxError,
-    client::{
-        model::{Descriptor, DynamicRequest, DynamicResponse},
-        with_file_descriptor::WithFileDescriptor,
-    },
     grpc::client::GrpcClient,
     reflection::client::{ReflectionClient, ReflectionResolveError},
 };
 use http_body::Body as HttpBody;
 use prost_reflect::DescriptorError;
 use prost_reflect::DescriptorPool;
+use std::fmt::Debug;
 use tonic::{
     Code,
     transport::{Channel, Endpoint},
@@ -46,6 +46,7 @@ pub enum GetDescriptorError {
     NotFound(String),
 }
 
+#[derive(Debug, Clone)]
 pub struct WithServerReflection<S> {
     reflection_client: ReflectionClient<S>,
     grpc_client: GrpcClient<S>,
