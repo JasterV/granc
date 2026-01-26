@@ -63,6 +63,7 @@ pub struct DynamicRequest {
 }
 
 /// The result of a dynamic gRPC call.
+#[derive(Debug, Clone)]
 pub enum DynamicResponse {
     /// A single response message (for Unary and Client Streaming calls).
     Unary(Result<serde_json::Value, tonic::Status>),
