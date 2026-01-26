@@ -1,6 +1,7 @@
 use echo_service::EchoServiceServer;
 use echo_service::FILE_DESCRIPTOR_SET;
 use echo_service_impl::EchoServiceImpl;
+use granc_core::client::with_file_descriptor;
 use granc_core::client::{DynamicRequest, DynamicResponse, GrancClient};
 use tonic_reflection::server::v1::ServerReflectionServer;
 
@@ -25,7 +26,7 @@ async fn test_unary() {
         method: "UnaryEcho".to_string(),
     };
 
-    let mut client = GrancClient::new(EchoServiceServer::new(EchoServiceImpl));
+    let mut client = GrancClient::from_service(EchoServiceServer::new(EchoServiceImpl));
 
     let res = client.dynamic(request).await.unwrap();
 
@@ -43,14 +44,14 @@ async fn test_server_streaming() {
     let payload = serde_json::json!({ "message": "stream" });
 
     let request = DynamicRequest {
-        file_descriptor_set: Some(FILE_DESCRIPTOR_SET.to_vec()),
         body: payload.clone(),
         headers: vec![],
         service: "echo.EchoService".to_string(),
         method: "ServerStreamingEcho".to_string(),
     };
 
-    let mut client = GrancClient::new(EchoServiceServer::new(EchoServiceImpl));
+    let mut client = GrancClient::from_service(EchoServiceServer::new(EchoServiceImpl))
+        .with_file_descriptor(FILE_DESCRIPTOR_SET.to_vec());
 
     let res = client.dynamic(request).await.unwrap();
 
@@ -79,16 +80,16 @@ async fn test_client_streaming() {
     ]);
 
     let request = DynamicRequest {
-        file_descriptor_set: Some(FILE_DESCRIPTOR_SET.to_vec()),
         body: payload.clone(),
         headers: vec![],
         service: "echo.EchoService".to_string(),
         method: "ClientStreamingEcho".to_string(),
     };
 
-    let mut client = GrancClient::new(EchoServiceServer::new(EchoServiceImpl));
+    let mut client = GrancClient::from_service(EchoServiceServer::new(EchoServiceImpl))
+        .with_file_descriptor(FILE_DESCRIPTOR_SET.to_vec());
 
-    let res = client.dynamic(request).await.unwrap();
+    let res = client.dynamic(request).unwrap();
 
     match res {
         DynamicResponse::Unary(Ok(value)) => {
@@ -116,7 +117,7 @@ async fn test_bidirectional_streaming() {
         method: "BidirectionalEcho".to_string(),
     };
 
-    let mut client = GrancClient::new(EchoServiceServer::new(EchoServiceImpl));
+    let mut client = GrancClient::from_service(EchoServiceServer::new(EchoServiceImpl));
 
     let res = client.dynamic(request).await.unwrap();
 
@@ -137,7 +138,7 @@ async fn test_bidirectional_streaming() {
 
 #[tokio::test]
 async fn test_list_services_success() {
-    let mut client = GrancClient::new(reflection_service());
+    let mut client = GrancClient::from_service(reflection_service());
 
     let services = client
         .list_services()
@@ -155,7 +156,7 @@ async fn test_list_services_success() {
 
 #[tokio::test]
 async fn test_get_service_descriptor_success() {
-    let mut client = GrancClient::new(reflection_service());
+    let mut client = GrancClient::from_service(reflection_service());
 
     let descriptor = client
         .get_descriptor_by_symbol("echo.EchoService")
@@ -177,7 +178,7 @@ async fn test_get_service_descriptor_success() {
 
 #[tokio::test]
 async fn test_get_message_descriptor_success() {
-    let mut client = GrancClient::new(reflection_service());
+    let mut client = GrancClient::from_service(reflection_service());
 
     let desc = client
         .get_descriptor_by_symbol("echo.EchoRequest")
@@ -196,7 +197,7 @@ async fn test_get_message_descriptor_success() {
 
 #[tokio::test]
 async fn test_get_descriptor_not_found() {
-    let mut client = GrancClient::new(reflection_service());
+    let mut client = GrancClient::from_service(reflection_service());
 
     // "echo.GhostService" does not exist in the registered descriptors.
     // The reflection client should fail to find the symbol, resulting in a ResolutionError.
