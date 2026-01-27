@@ -27,7 +27,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Connect (starts in Reflection mode)
     let mut client = GrancClient::connect("http://localhost:50051").await?;
 
-    // 2. Prepare the request
     let request = DynamicRequest {
         service: "helloworld.Greeter".to_string(),
         method: "SayHello".to_string(),
