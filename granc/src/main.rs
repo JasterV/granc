@@ -24,14 +24,14 @@ use std::process;
 async fn main() {
     let args = Cli::parse();
 
-    let client_reflection = unwrap_or_exit(GrancClient::connect(&args.url).await);
+    let client = unwrap_or_exit(GrancClient::connect(&args.url).await);
 
     if let Some(path) = args.file_descriptor_set {
         let bytes = unwrap_or_exit(std::fs::read(&path));
-        let client_fd = unwrap_or_exit(client_reflection.with_file_descriptor(bytes));
-        handle_file_descriptor_mode(client_fd, args.command).await;
+        let client = unwrap_or_exit(client.with_file_descriptor(bytes));
+        handle_file_descriptor_mode(client, args.command).await;
     } else {
-        handle_reflection_mode(client_reflection, args.command).await;
+        handle_reflection_mode(client, args.command).await;
     }
 }
 
