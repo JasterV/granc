@@ -88,8 +88,10 @@ granc http://localhost:50051 [OPTIONS] call <ENDPOINT> --body <JSON> [ARGS]
 **Example using Server Reflection:**
 
 ```bash
-$ granc http://localhost:50051 call helloworld.Greeter/SayHello --body '{"name": "Ferris"}'
+granc http://localhost:50051 call helloworld.Greeter/SayHello --body '{"name": "Ferris"}'
+```
 
+```json
 {
   "message": "Hello Ferris"
 }
@@ -98,7 +100,7 @@ $ granc http://localhost:50051 call helloworld.Greeter/SayHello --body '{"name":
 **Example using a Local Descriptor File:**
 
 ```bash
-$ granc http://localhost:50051 --file-descriptor-set ./descriptors.bin call helloworld.Greeter/SayHello --body '{"name": "Ferris"}'
+granc http://localhost:50051 --file-descriptor-set ./descriptors.bin call helloworld.Greeter/SayHello --body '{"name": "Ferris"}'
 ```
 
 #### 2. `list` (Service Discovery)
@@ -106,8 +108,10 @@ $ granc http://localhost:50051 --file-descriptor-set ./descriptors.bin call hell
 Lists all services exposed by the server (via reflection) or contained in the provided descriptor file.
 
 ```bash
-$ granc http://localhost:50051 list
+granc http://localhost:50051 list
+```
 
+```
 Available Services:
   - grpc.reflection.v1.ServerReflection
   - helloworld.Greeter
@@ -124,7 +128,7 @@ granc http://localhost:50051 --file-descriptor-set ./descriptors.bin list
 Inspects a specific symbol (Service, Message, or Enum) and prints its Protobuf definition in a colored, human-readable format.
 
 ```bash
-$ granc http://localhost:50051 describe helloworld.Greeter
+granc http://localhost:50051 describe helloworld.Greeter
 ```
 
 ```proto
@@ -140,10 +144,18 @@ service Greeter {
 granc http://localhost:50051 --file-descriptor-set ./descriptors.bin describe helloworld.HelloRequest
 ```
 
+```proto 
+message HelloRequest {
+  string name = 1;
+  int32 age = 2;
+  repeated string tags = 3;
+}
+```
+
 **Describing an Enum:**
 
 ```bash
-$ granc http://localhost:50051 describe my.package.Status
+granc http://localhost:50051 describe my.package.Status
 ```
 
 ```proto
