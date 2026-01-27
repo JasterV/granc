@@ -24,8 +24,7 @@ use serde_json::json;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // 1. Connect to the server
-    // Returns GrancClient<WithServerReflection>
+    // Connect (starts in Reflection mode)
     let mut client = GrancClient::connect("http://localhost:50051").await?;
 
     // 2. Prepare the request
@@ -36,7 +35,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         headers: vec![],
     };
 
-    // 3. Execute (Schema is fetched automatically via reflection)
+    // Execute (Schema is fetched automatically via reflection)
     let response = client.dynamic(request).await?;
 
     match response {
@@ -59,18 +58,17 @@ use granc_core::client::GrancClient;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // 1. Connect (starts in Reflection mode)
-    let client_reflection = GrancClient::connect("http://localhost:50051").await?;
+    // Connect (starts in Reflection mode)
+    let client = GrancClient::connect("http://localhost:50051").await?;
 
-    // 2. Load the descriptor file bytes
-    let descriptor_bytes = std::fs::read("descriptors.bin")?;
+    // Read the descriptor file
+    let descriptor_bytes = std::fs::read("descriptor.bin")?;
 
-    // 3. Transition to File Descriptor mode
-    // Returns GrancClient<WithFileDescriptor>
-    let mut client_fd = client_reflection.with_file_descriptor(descriptor_bytes)?;
+    // Transition to File Descriptor mode
+    let mut client = client.with_file_descriptor(descriptor_bytes)?;
 
-    // 4. Now use this client for requests. It will NOT query the server for schema.
-    let services = client_fd.list_services(); // Lists services found in the local file
+    // Now use this client for requests. It will NOT query the server for schema.
+    let services = client.list_services();
     println!("Services in file: {:?}", services);
 
     Ok(())

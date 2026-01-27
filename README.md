@@ -30,7 +30,6 @@ It is heavily inspired by tools like `grpcurl` but built to leverage the safety 
 
 ```bash
 cargo install --locked granc
-
 ```
 
 ## 🛠️ Prerequisites
@@ -51,7 +50,6 @@ protoc \
     --descriptor_set_out=descriptor.bin \
     --proto_path=. \
     my_service.proto
-
 ```
 
 > **Note**: The `--include_imports` flag is crucial. It ensures that types defined in imported files (like `google/protobuf/timestamp.proto`) are available for reflection.
@@ -62,7 +60,6 @@ protoc \
 
 ```bash
 granc <URL> [OPTIONS] <COMMAND> [ARGS]
-
 ```
 
 ### Global Arguments
@@ -79,7 +76,7 @@ granc <URL> [OPTIONS] <COMMAND> [ARGS]
 Performs a gRPC call using a JSON body.
 
 ```bash
-granc http://localhost:50051 call <ENDPOINT> --body <JSON> [OPTIONS]
+granc http://localhost:50051 [OPTIONS] call <ENDPOINT> --body <JSON> [ARGS]
 ```
 
 | Argument/Flag | Description | Required |
@@ -96,16 +93,12 @@ $ granc http://localhost:50051 call helloworld.Greeter/SayHello --body '{"name":
 {
   "message": "Hello Ferris"
 }
-
 ```
 
 **Example using a Local Descriptor File:**
 
 ```bash
-$ granc http://localhost:50051 \
-    --file-descriptor-set ./descriptors.bin \
-    call helloworld.Greeter/SayHello --body '{"name": "Ferris"}'
-
+$ granc http://localhost:50051 --file-descriptor-set ./descriptors.bin call helloworld.Greeter/SayHello --body '{"name": "Ferris"}'
 ```
 
 #### 2. `list` (Service Discovery)
@@ -132,7 +125,9 @@ Inspects a specific symbol (Service, Message, or Enum) and prints its Protobuf d
 
 ```bash
 $ granc http://localhost:50051 describe helloworld.Greeter
+```
 
+```proto
 service Greeter {
   rpc SayHello(helloworld.HelloRequest) returns (helloworld.HelloReply);
   rpc StreamHello(stream helloworld.HelloRequest) returns (stream helloworld.HelloReply);
@@ -142,16 +137,16 @@ service Greeter {
 **Describing a Message using a Local File:**
 
 ```bash
-granc http://localhost:50051 \
-    --file-descriptor-set ./descriptors.bin \
-    describe helloworld.HelloRequest
+granc http://localhost:50051 --file-descriptor-set ./descriptors.bin describe helloworld.HelloRequest
 ```
 
 **Describing an Enum:**
 
 ```bash
 $ granc http://localhost:50051 describe my.package.Status
+```
 
+```proto
 enum Status {
   UNKNOWN = 0;
   ACTIVE = 1;
