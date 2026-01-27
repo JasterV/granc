@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## `granc_core` - [0.5.0](https://github.com/JasterV/granc/compare/granc_core-v0.4.1...granc_core-v0.5.0) - 2026-01-27
+
+- **Typestate design refactor**: The GrancClient has been refactored to support multiple states where invariants for each state are ensured by the compiler. ([#28](https://github.com/JasterV/granc/pull/28))
+  - The GrancClient can be in either a `WithServerReflection` state or a `WithFileDescriptor` state, and both states have independent APIs (Async vs sync).
+
 ## `granc` - [0.5.1](https://github.com/JasterV/granc/compare/granc-v0.5.0...granc-v0.5.1) - 2026-01-24
 
 ### Other
