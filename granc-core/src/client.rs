@@ -36,8 +36,10 @@
 pub mod with_file_descriptor;
 pub mod with_server_reflection;
 
-use prost_reflect::{EnumDescriptor, MessageDescriptor, ServiceDescriptor};
+use crate::{grpc::client::GrpcClient, reflection::client::ReflectionClient};
+use prost_reflect::{DescriptorPool, EnumDescriptor, MessageDescriptor, ServiceDescriptor};
 use std::fmt::Debug;
+use tonic::transport::Channel;
 
 /// The main client for interacting with gRPC servers dynamically.
 ///
@@ -46,6 +48,20 @@ use std::fmt::Debug;
 #[derive(Clone, Debug)]
 pub struct GrancClient<T> {
     state: T,
+}
+
+/// The state for a client that uses a local `DescriptorPool` for schema resolution.
+#[derive(Debug, Clone)]
+pub struct WithFileDescriptor<S = Channel> {
+    grpc_client: GrpcClient<S>,
+    pool: DescriptorPool,
+}
+
+/// The state for a client that uses Server Reflection for schema resolution.
+#[derive(Debug, Clone)]
+pub struct WithServerReflection<S = Channel> {
+    reflection_client: ReflectionClient<S>,
+    grpc_client: GrpcClient<S>,
 }
 
 /// A request object encapsulating all necessary information to perform a dynamic gRPC call.

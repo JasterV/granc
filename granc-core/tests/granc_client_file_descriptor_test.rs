@@ -1,17 +1,14 @@
 use echo_service::{EchoServiceServer, FILE_DESCRIPTOR_SET};
 use echo_service_impl::EchoServiceImpl;
 use granc_core::client::{
-    Descriptor, DynamicRequest, DynamicResponse, GrancClient, with_file_descriptor,
+    Descriptor, DynamicRequest, DynamicResponse, GrancClient, WithFileDescriptor,
+    with_file_descriptor,
 };
 use tonic::Code;
 
 mod echo_service_impl;
 
-fn setup_client() -> GrancClient<
-    granc_core::client::with_file_descriptor::WithFileDescriptor<
-        EchoServiceServer<EchoServiceImpl>,
-    >,
-> {
+fn setup_client() -> GrancClient<WithFileDescriptor<EchoServiceServer<EchoServiceImpl>>> {
     let service = EchoServiceServer::new(EchoServiceImpl);
     let client_reflection = GrancClient::from_service(service);
 

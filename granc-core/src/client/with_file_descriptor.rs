@@ -4,6 +4,7 @@
 //! `DescriptorPool` (loaded from a file) to resolve schemas.
 //!
 //! In this state, the client does **not** use server reflection for schema lookup.
+use super::WithFileDescriptor;
 use super::{Descriptor, DynamicRequest, DynamicResponse, GrancClient};
 use crate::{
     BoxError,
@@ -14,7 +15,6 @@ use futures_util::StreamExt;
 use http_body::Body as HttpBody;
 use prost_reflect::DescriptorPool;
 use std::fmt::Debug;
-use tonic::transport::Channel;
 
 #[derive(Debug, thiserror::Error)]
 pub enum DynamicCallError {
@@ -29,13 +29,6 @@ pub enum DynamicCallError {
 
     #[error("gRPC client request error: '{0}'")]
     GrpcRequestError(#[from] GrpcRequestError),
-}
-
-/// The state for a client that uses a local `DescriptorPool` for schema resolution.
-#[derive(Debug, Clone)]
-pub struct WithFileDescriptor<S = Channel> {
-    grpc_client: GrpcClient<S>,
-    pool: DescriptorPool,
 }
 
 impl<S> GrancClient<WithFileDescriptor<S>>

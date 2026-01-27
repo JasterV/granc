@@ -3,8 +3,8 @@
 //! This module defines the `GrancClient` behavior when it is using the server's reflection service
 //! to resolve schemas.
 use super::{
-    Descriptor, DynamicRequest, DynamicResponse, GrancClient,
-    with_file_descriptor::WithFileDescriptor,
+    Descriptor, DynamicRequest, DynamicResponse, GrancClient, WithFileDescriptor,
+    WithServerReflection,
 };
 use crate::{
     BoxError,
@@ -48,13 +48,6 @@ pub enum GetDescriptorError {
     DescriptorError(#[from] DescriptorError),
     #[error("Descriptor at path '{0}' not found")]
     NotFound(String),
-}
-
-/// The state for a client that uses Server Reflection for schema resolution.
-#[derive(Debug, Clone)]
-pub struct WithServerReflection<S = Channel> {
-    reflection_client: ReflectionClient<S>,
-    grpc_client: GrpcClient<S>,
 }
 
 impl GrancClient<WithServerReflection<Channel>> {

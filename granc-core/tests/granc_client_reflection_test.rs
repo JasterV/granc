@@ -1,8 +1,8 @@
 use echo_service::{EchoServiceServer, FILE_DESCRIPTOR_SET};
 use echo_service_impl::EchoServiceImpl;
 use granc_core::client::{
-    Descriptor, DynamicRequest, DynamicResponse, GrancClient, with_file_descriptor,
-    with_server_reflection,
+    Descriptor, DynamicRequest, DynamicResponse, GrancClient, WithServerReflection,
+    with_file_descriptor, with_server_reflection,
 };
 use granc_core::reflection::client::ReflectionResolveError;
 use tonic::Code;
@@ -10,7 +10,7 @@ use tonic::service::Routes;
 
 mod echo_service_impl;
 
-async fn setup_client() -> GrancClient<with_server_reflection::WithServerReflection<Routes>> {
+async fn setup_client() -> GrancClient<WithServerReflection<Routes>> {
     let reflection_service = tonic_reflection::server::Builder::configure()
         .register_encoded_file_descriptor_set(FILE_DESCRIPTOR_SET)
         .build_v1()

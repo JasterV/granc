@@ -14,8 +14,8 @@ use clap::Parser;
 use cli::{Cli, Commands};
 use formatter::{FormattedString, GenericError, ServiceList};
 use granc_core::client::{
-    Descriptor, DynamicRequest, DynamicResponse, GrancClient,
-    with_file_descriptor::WithFileDescriptor, with_server_reflection::WithServerReflection,
+    Descriptor, DynamicRequest, DynamicResponse, GrancClient, WithFileDescriptor,
+    WithServerReflection,
 };
 use granc_core::tonic::transport::Channel;
 use std::process;
