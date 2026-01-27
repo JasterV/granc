@@ -44,10 +44,7 @@ where
 {
     pub(crate) fn new(grpc_client: GrpcClient<S>, pool: DescriptorPool) -> Self {
         Self {
-            state: WithFileDescriptor {
-                grpc_client,
-                pool: pool,
-            },
+            state: WithFileDescriptor { grpc_client, pool },
         }
     }
 }
