@@ -5,7 +5,7 @@
 
 > ⚠️ **Status: Experimental**
 >
-> This project is currently in a **highly experimental phase**. It is a working prototype intended for testing and development purposes. APIs, command-line arguments, and internal logic are subject to breaking changes. Please use with caution.
+> This project is a working prototype intended for testing and development purposes. APIs, command-line arguments, and internal logic are subject to breaking changes. Please use with caution.
 
 **Granc** (gRPC + Cranc, Crab in Catalan) is a lightweight, dynamic gRPC CLI tool written in Rust.
 
