@@ -5,41 +5,27 @@ use granc_core::client::{
     with_server_reflection,
 };
 use granc_core::reflection::client::ReflectionResolveError;
-use std::net::SocketAddr;
-use tokio::net::TcpListener;
-use tokio_stream::wrappers::TcpListenerStream;
-use tonic::{Code, transport::Server};
+use tonic::Code;
+use tonic::service::Routes;
 
 mod echo_service_impl;
 
-async fn spawn_server() -> SocketAddr {
-    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
-    let addr = listener.local_addr().unwrap();
+async fn setup_client() -> GrancClient<with_server_reflection::WithServerReflection<Routes>> {
+    let reflection_service = tonic_reflection::server::Builder::configure()
+        .register_encoded_file_descriptor_set(FILE_DESCRIPTOR_SET)
+        .build_v1()
+        .unwrap();
 
-    tokio::spawn(async move {
-        let reflection_service = tonic_reflection::server::Builder::configure()
-            .register_encoded_file_descriptor_set(FILE_DESCRIPTOR_SET)
-            .build_v1()
-            .unwrap();
+    let echo_service = EchoServiceServer::new(EchoServiceImpl);
 
-        let echo_service = EchoServiceServer::new(EchoServiceImpl);
+    let service = Routes::new(reflection_service).add_service(echo_service);
 
-        Server::builder()
-            .add_service(reflection_service)
-            .add_service(echo_service)
-            .serve_with_incoming(TcpListenerStream::new(listener))
-            .await
-            .unwrap();
-    });
-
-    addr
+    GrancClient::from_service(service)
 }
 
 #[tokio::test]
-async fn test_list_services() {
-    let addr = spawn_server().await;
-    let url = format!("http://{}", addr);
-    let mut client = GrancClient::connect(&url).await.unwrap();
+async fn test_reflection_list_services() {
+    let mut client = setup_client().await;
 
     let services = client.list_services().await.unwrap();
     assert!(services.contains(&"echo.EchoService".to_string()));
@@ -47,10 +33,8 @@ async fn test_list_services() {
 }
 
 #[tokio::test]
-async fn test_describe_descriptors() {
-    let addr = spawn_server().await;
-    let url = format!("http://{}", addr);
-    let mut client = GrancClient::connect(&url).await.unwrap();
+async fn test_reflection_describe_descriptors() {
+    let mut client = setup_client().await;
 
     // 1. Describe Service
     let desc = client
@@ -78,10 +62,8 @@ async fn test_describe_descriptors() {
 }
 
 #[tokio::test]
-async fn test_describe_error() {
-    let addr = spawn_server().await;
-    let url = format!("http://{}", addr);
-    let mut client = GrancClient::connect(&url).await.unwrap();
+async fn test_reflection_describe_error() {
+    let mut client = setup_client().await;
 
     // Error Case: Non-existent symbol
     let result = client.get_descriptor_by_symbol("echo.Ghost").await;
@@ -93,10 +75,8 @@ async fn test_describe_error() {
 }
 
 #[tokio::test]
-async fn test_dynamic_calls() {
-    let addr = spawn_server().await;
-    let url = format!("http://{}", addr);
-    let mut client = GrancClient::connect(&url).await.unwrap();
+async fn test_reflection_dynamic_calls() {
+    let mut client = setup_client().await;
 
     // 1. Unary Call
     let req = DynamicRequest {
@@ -162,13 +142,10 @@ async fn test_dynamic_calls() {
 }
 
 #[tokio::test]
-async fn test_dynamic_error_cases() {
-    let addr = spawn_server().await;
-    let url = format!("http://{}", addr);
-    let mut client = GrancClient::connect(&url).await.unwrap();
+async fn test_reflection_dynamic_error_cases() {
+    let mut client = setup_client().await;
 
     // 1. Invalid Service Name
-    // The reflection client will try to fetch the schema for "echo.GhostService" and fail.
     let req = DynamicRequest {
         service: "echo.GhostService".to_string(),
         method: "UnaryEcho".to_string(),
@@ -186,7 +163,6 @@ async fn test_dynamic_error_cases() {
     ));
 
     // 2. Invalid Method Name
-    // The reflection will succeed for the Service, but then the method lookup will fail locally.
     let req = DynamicRequest {
         service: "echo.EchoService".to_string(),
         method: "GhostMethod".to_string(),
@@ -222,7 +198,7 @@ async fn test_dynamic_error_cases() {
 
     // 4. Schema Mismatch (Unary)
     // Passing a field that doesn't exist. This fails at encoding time inside the Codec.
-    // Tonic captures this and returns it as a Status::InvalidArgument.
+    // Tonic wraps encoding errors as Code::Internal.
     let req = DynamicRequest {
         service: "echo.EchoService".to_string(),
         method: "UnaryEcho".to_string(),
