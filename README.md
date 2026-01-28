@@ -71,14 +71,14 @@ granc <COMMAND> [ARGS]
 Performs a gRPC call using a JSON body.
 
 ```bash
-granc call <ENDPOINT> --url <URL> --body <JSON> [OPTIONS]
+granc call <ENDPOINT> --uri <URI> --body <JSON> [OPTIONS]
 
 ```
 
 | Argument/Flag | Short | Description | Required |
 | --- | --- | --- | --- |
 | `<ENDPOINT>` |  | Fully qualified method name (e.g., `my.package.Service/Method`). | **Yes** |
-| `--url` | `-u` | Server address (e.g., `http://[::1]:50051`). | **Yes** |
+| `--uri` | `-u` | Server address (e.g., `http://[::1]:50051`). | **Yes** |
 | `--body` | `-b` | The request body in JSON format. Object `{}` for unary, Array `[]` for streaming. | **Yes** |
 | `--header` | `-H` | Custom header `key:value`. Can be used multiple times. | No |
 | `--file-descriptor-set` | `-f` | Path to a local `.bin` descriptor file to use instead of reflection. | No |
@@ -86,7 +86,7 @@ granc call <ENDPOINT> --url <URL> --body <JSON> [OPTIONS]
 **Example using Server Reflection:**
 
 ```bash
-granc call helloworld.Greeter/SayHello --url http://localhost:50051 --body '{"name": "Ferris"}'
+granc call helloworld.Greeter/SayHello --uri http://localhost:50051 --body '{"name": "Ferris"}'
 
 ```
 
@@ -101,7 +101,7 @@ granc call helloworld.Greeter/SayHello --url http://localhost:50051 --body '{"na
 
 ```bash
 granc call helloworld.Greeter/SayHello \
-  --url http://localhost:50051 \
+  --uri http://localhost:50051 \
   --file-descriptor-set ./descriptors.bin \
   --body '{"name": "Ferris"}'
 
@@ -109,7 +109,7 @@ granc call helloworld.Greeter/SayHello \
 
 #### 2. `list` (Service Discovery)
 
-Lists all services exposed by the server (via reflection) or contained in the provided descriptor file. You must provide **either** a URL or a file descriptor set.
+Lists all services exposed by the server (via reflection) or contained in the provided descriptor file. You must provide **either** a URI or a file descriptor set.
 
 ```bash
 granc list [OPTIONS]
@@ -118,13 +118,13 @@ granc list [OPTIONS]
 
 | Flag | Short | Description |
 | --- | --- | --- |
-| `--url` | `-u` | Use Server Reflection to list available services. |
+| `--uri` | `-u` | Use Server Reflection to list available services. |
 | `--file-descriptor-set` | `-f` | Use a local file to list contained services (offline). |
 
 **Listing services via Reflection:**
 
 ```bash
-granc list --url http://localhost:50051
+granc list --uri http://localhost:50051
 
 ```
 
@@ -144,7 +144,7 @@ granc list --file-descriptor-set ./descriptors.bin
 
 #### 3. `describe` (Introspection)
 
-Inspects a specific symbol (Service, Message, or Enum) and prints its Protobuf definition in a colored, human-readable format. You must provide **either** a URL or a file descriptor set.
+Inspects a specific symbol (Service, Message, or Enum) and prints its Protobuf definition in a colored, human-readable format. You must provide **either** a URI or a file descriptor set.
 
 ```bash
 granc describe <SYMBOL> [OPTIONS]
@@ -154,13 +154,13 @@ granc describe <SYMBOL> [OPTIONS]
 | Argument/Flag | Short | Description |
 | --- | --- | --- |
 | `<SYMBOL>` |  | Fully qualified name of the Service, Message, or Enum. |
-| `--url` | `-u` | Use Server Reflection to resolve the symbol. |
+| `--uri` | `-u` | Use Server Reflection to resolve the symbol. |
 | `--file-descriptor-set` | `-f` | Use a local file to resolve the symbol (offline). |
 
 **Describing a Service via Reflection:**
 
 ```bash
-granc describe helloworld.Greeter --url http://localhost:50051
+granc describe helloworld.Greeter --uri http://localhost:50051
 
 ```
 
@@ -191,7 +191,7 @@ message HelloRequest {
 **Describing an Enum:**
 
 ```bash
-granc describe my.package.Status --url http://localhost:50051
+granc describe my.package.Status --uri http://localhost:50051
 
 ```
 

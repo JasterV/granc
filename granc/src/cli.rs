@@ -17,15 +17,15 @@ pub struct Cli {
 pub enum Commands {
     /// Perform a gRPC call to a server.
     ///
-    /// Requires a server URL. Can optionally use a local file descriptor set.
+    /// Requires a server URI. Can optionally use a local file descriptor set.
     Call {
         /// Endpoint (package.Service/Method)
         #[arg(value_parser = parse_endpoint)]
         endpoint: (String, String),
 
-        /// The server URL to connect to (e.g. http://localhost:50051)
+        /// The server URI to connect to (e.g. http://localhost:50051)
         #[arg(long, short = 'u')]
-        url: String,
+        uri: String,
 
         /// "JSON body (Object for Unary, Array for Streaming)"
         #[arg(long, short = 'b', value_parser = parse_body)]
@@ -41,7 +41,7 @@ pub enum Commands {
 
     /// List available services.
     ///
-    /// Requires EITHER a server URL (Reflection) OR a file descriptor set (Offline).
+    /// Requires EITHER a server URI (Reflection) OR a file descriptor set (Offline).
     List {
         #[command(flatten)]
         source: SourceSelection,
@@ -49,7 +49,7 @@ pub enum Commands {
 
     /// Describe a service, message or enum.
     ///
-    /// Requires EITHER a server URL (Reflection) OR a file descriptor set (Offline).
+    /// Requires EITHER a server URI (Reflection) OR a file descriptor set (Offline).
     Describe {
         #[command(flatten)]
         source: SourceSelection,
@@ -60,11 +60,11 @@ pub enum Commands {
 }
 
 #[derive(Args, Debug)]
-#[group(required = true, multiple = false)] // Enforces: Either URL OR FileDescriptorSet, never both.
+#[group(required = true, multiple = false)] // Enforces: Either URI OR FileDescriptorSet, never both.
 pub struct SourceSelection {
-    /// The server URL to use for reflection-based introspection
+    /// The server URI to use for reflection-based introspection
     #[arg(long, short = 'u')]
-    url: Option<String>,
+    uri: Option<String>,
 
     /// Path to the descriptor set (.bin) to use for offline introspection
     #[arg(long, short = 'f')]
@@ -73,23 +73,23 @@ pub struct SourceSelection {
 
 // The source where to resolve the proto schemas from.
 //
-// It can either be a URL (If the server supports server streaming)
+// It can either be a URI (If the server supports server streaming)
 // or a file (a `.bin` or `.pb` file generated with protoc)
 pub enum Source {
-    Url(String),
+    Uri(String),
     File(PathBuf),
 }
 
 impl SourceSelection {
     pub fn value(self) -> Source {
-        if let Some(url) = self.url {
-            Source::Url(url)
+        if let Some(uri) = self.uri {
+            Source::Uri(uri)
         } else if let Some(path) = self.file_descriptor_set {
             Source::File(path)
         } else {
             // This is unreachable because `clap` verifies the group requirements before we ever get here.
             unreachable!(
-                "Clap ensures exactly one argument (url or file) is present via #[group(required = true)]"
+                "Clap ensures exactly one argument (uri or file) is present via #[group(required = true)]"
             )
         }
     }
@@ -128,7 +128,7 @@ mod tests {
             "granc",
             "call",
             "helloworld.Greeter/SayHello",
-            "--url",
+            "--uri",
             "http://localhost:50051",
             "--body",
             r#"{"name": "Ferris"}"#,
@@ -139,7 +139,7 @@ mod tests {
         match cli.command {
             Commands::Call {
                 endpoint,
-                url,
+                uri,
                 body,
                 file_descriptor_set,
                 ..
@@ -148,7 +148,7 @@ mod tests {
                     endpoint,
                     ("helloworld.Greeter".to_string(), "SayHello".to_string())
                 );
-                assert_eq!(url, "http://localhost:50051");
+                assert_eq!(uri, "http://localhost:50051");
                 assert_eq!(body, serde_json::json!({"name": "Ferris"}));
                 assert!(file_descriptor_set.is_none());
             }
@@ -162,7 +162,7 @@ mod tests {
             "granc",
             "call",
             "helloworld.Greeter/SayHello",
-            "--url",
+            "--uri",
             "http://localhost:50051",
             "--body",
             r#"{"name": "Ferris"}"#,
@@ -206,13 +206,13 @@ mod tests {
 
         match cli.command {
             Commands::Call {
-                url,
+                uri,
                 file_descriptor_set,
                 headers,
                 body,
                 ..
             } => {
-                assert_eq!(url, "http://localhost:50051");
+                assert_eq!(uri, "http://localhost:50051");
                 assert_eq!(file_descriptor_set.unwrap().to_str().unwrap(), "desc.bin");
                 assert_eq!(body, serde_json::json!({}));
                 assert_eq!(headers[0], ("auth".to_string(), "bearer".to_string()));
@@ -223,12 +223,12 @@ mod tests {
 
     #[test]
     fn test_list_command_reflection() {
-        let args = vec!["granc", "list", "--url", "http://localhost:50051"];
+        let args = vec!["granc", "list", "--uri", "http://localhost:50051"];
         let cli = Cli::try_parse_from(&args).expect("Parsing failed");
 
         match cli.command {
             Commands::List { source } => {
-                assert_eq!(source.url.unwrap(), "http://localhost:50051");
+                assert_eq!(source.uri.unwrap(), "http://localhost:50051");
                 assert!(source.file_descriptor_set.is_none());
             }
             _ => panic!("Expected List command"),
@@ -246,7 +246,7 @@ mod tests {
                     source.file_descriptor_set.unwrap().to_str().unwrap(),
                     "desc.bin"
                 );
-                assert!(source.url.is_none());
+                assert!(source.uri.is_none());
             }
             _ => panic!("Expected List command"),
         }
@@ -258,7 +258,7 @@ mod tests {
             "granc",
             "describe",
             "helloworld.Greeter",
-            "--url",
+            "--uri",
             "http://localhost:50051",
         ];
         let cli = Cli::try_parse_from(&args).expect("Parsing failed");
@@ -266,7 +266,7 @@ mod tests {
         match cli.command {
             Commands::Describe { symbol, source } => {
                 assert_eq!(symbol, "helloworld.Greeter");
-                assert!(source.url.is_some());
+                assert!(source.uri.is_some());
             }
             _ => panic!("Expected Describe command"),
         }
@@ -310,7 +310,7 @@ mod tests {
         let args = vec![
             "granc",
             "list",
-            "--url",
+            "--uri",
             "http://host",
             "--file-descriptor-set",
             "file.bin",

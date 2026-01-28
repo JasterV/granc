@@ -22,8 +22,8 @@ use tonic::{
 /// Errors that can occur when connecting to a gRPC server.
 #[derive(Debug, thiserror::Error)]
 pub enum ClientConnectError {
-    #[error("Invalid URL '{0}': {1}")]
-    InvalidUrl(String, #[source] tonic::transport::Error),
+    #[error("Invalid URI '{0}': {1}")]
+    InvalidUri(String, #[source] tonic::transport::Error),
     #[error("Failed to connect to '{0}': {1}")]
     ConnectionFailed(String, #[source] tonic::transport::Error),
 }
@@ -63,10 +63,10 @@ impl GrancClient<Online<Channel>> {
     /// # Returns
     ///
     /// * `Ok(GrancClient<Online>)` - A connected client ready to make dynamic requests via reflection.
-    /// * `Err(ClientConnectError)` - If the URL is invalid or the TCP connection cannot be established.
+    /// * `Err(ClientConnectError)` - If the URI is invalid or the TCP connection cannot be established.
     pub async fn connect(addr: &str) -> Result<Self, ClientConnectError> {
         let endpoint = Endpoint::new(addr.to_string())
-            .map_err(|e| ClientConnectError::InvalidUrl(addr.to_string(), e))?;
+            .map_err(|e| ClientConnectError::InvalidUri(addr.to_string(), e))?;
 
         let channel = endpoint
             .connect()

@@ -23,12 +23,12 @@ async fn main() {
     match args.command {
         Commands::Call {
             endpoint,
-            url,
+            uri,
             body,
             headers,
             file_descriptor_set,
         } => {
-            let response = call(endpoint, url, body, headers, file_descriptor_set).await;
+            let response = call(endpoint, uri, body, headers, file_descriptor_set).await;
             println!("{}", FormattedString::from(response))
         }
 
@@ -49,7 +49,7 @@ async fn main() {
 
 async fn call(
     endpoint: (String, String),
-    url: String,
+    uri: String,
     body: serde_json::Value,
     headers: Vec<(String, String)>,
     file_descriptor_set: Option<std::path::PathBuf>,
@@ -63,7 +63,7 @@ async fn call(
         headers,
     };
 
-    let mut client = GrancClient::connect(&url).await.unwrap_or_exit();
+    let mut client = GrancClient::connect(&uri).await.unwrap_or_exit();
 
     if let Some(path) = file_descriptor_set {
         let bytes = std::fs::read(path).unwrap_or_exit();
@@ -76,8 +76,8 @@ async fn call(
 
 async fn list(source: Source) -> Vec<String> {
     match source {
-        Source::Url(url) => {
-            let mut client = GrancClient::connect(&url).await.unwrap_or_exit();
+        Source::Uri(uri) => {
+            let mut client = GrancClient::connect(&uri).await.unwrap_or_exit();
             client
                 .list_services()
                 .await
@@ -95,8 +95,8 @@ async fn list(source: Source) -> Vec<String> {
 
 async fn describe(symbol: String, source: Source) -> Descriptor {
     match source {
-        Source::Url(url) => {
-            let mut client = GrancClient::connect(&url).await.unwrap_or_exit();
+        Source::Uri(uri) => {
+            let mut client = GrancClient::connect(&uri).await.unwrap_or_exit();
             client
                 .get_descriptor_by_symbol(&symbol)
                 .await
