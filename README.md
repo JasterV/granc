@@ -80,7 +80,7 @@ granc call <ENDPOINT> --url <URL> --body <JSON> [OPTIONS]
 | `<ENDPOINT>` |  | Fully qualified method name (e.g., `my.package.Service/Method`). | **Yes** |
 | `--url` | `-u` | Server address (e.g., `http://[::1]:50051`). | **Yes** |
 | `--body` | `-b` | The request body in JSON format. Object `{}` for unary, Array `[]` for streaming. | **Yes** |
-| `--header` | `-h` | Custom header `key:value`. Can be used multiple times. | No |
+| `--header` | `-H` | Custom header `key:value`. Can be used multiple times. | No |
 | `--file-descriptor-set` | `-f` | Path to a local `.bin` descriptor file to use instead of reflection. | No |
 
 **Example using Server Reflection:**
@@ -216,7 +216,7 @@ The core logic of Granc is decoupled into a separate library crate, **`granc-cor
 
 If you want to build your own tools using the dynamic gRPC engine (e.g., for custom integration testing, proxies, or automation tools), you can depend on `granc-core` directly.
 
-* **Documentation & Usage**: See the **[`granc-core` README](https://www.google.com/search?q=https://github.com/JasterV/granc/tree/main/granc-core%23readme)** for examples on how to use the `GrancClient` programmatically.
+* **Documentation & Usage**: See the **[`granc-core` README](./granc-core/README.md)** for examples on how to use the `GrancClient` programmatically.
 * **Crate**: [`granc-core`](https://crates.io/crates/granc_core)
 
 ## ⚠️ Common Errors
