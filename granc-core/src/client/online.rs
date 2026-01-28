@@ -7,6 +7,7 @@ use super::{
 };
 use crate::{
     BoxError,
+    client::Offline,
     grpc::client::GrpcClient,
     reflection::client::{ReflectionClient, ReflectionResolveError},
 };
@@ -103,7 +104,11 @@ where
         file_descriptor: Vec<u8>,
     ) -> Result<GrancClient<OnlineWithoutReflection<S>>, DescriptorError> {
         let pool = DescriptorPool::decode(file_descriptor.as_slice())?;
-        Ok(GrancClient::new(self.state.grpc_client, pool))
+
+        Ok(GrancClient::new(OnlineWithoutReflection::new(
+            self.state.grpc_client,
+            pool,
+        )))
     }
 
     /// Lists services available on the server via Reflection.
@@ -134,9 +139,7 @@ where
 
         let pool = DescriptorPool::from_file_descriptor_set(fd_set)?;
 
-        // Build a temporary OnlineWithoutReflection client just to reuse lookup logic
-        let mut client =
-            GrancClient::<OnlineWithoutReflection<S>>::new(self.state.grpc_client.clone(), pool);
+        let client = GrancClient::new(Offline::new(pool));
 
         client
             .get_descriptor_by_symbol(symbol)
@@ -159,8 +162,11 @@ where
             .await?;
         let pool = DescriptorPool::from_file_descriptor_set(fd_set)?;
 
-        let mut client =
-            GrancClient::<OnlineWithoutReflection<S>>::new(self.state.grpc_client.clone(), pool);
+        let mut client = GrancClient::new(OnlineWithoutReflection::new(
+            self.state.grpc_client.clone(),
+            pool,
+        ));
+
         Ok(client.dynamic(request).await?)
     }
 }

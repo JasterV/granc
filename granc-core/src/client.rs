@@ -35,9 +35,12 @@
 pub mod offline;
 pub mod online;
 pub mod online_without_reflection;
+mod types;
+
+pub use types::*;
 
 use crate::{grpc::client::GrpcClient, reflection::client::ReflectionClient};
-use prost_reflect::{DescriptorPool, EnumDescriptor, MessageDescriptor, ServiceDescriptor};
+use prost_reflect::DescriptorPool;
 use std::fmt::Debug;
 use tonic::transport::Channel;
 
@@ -47,6 +50,12 @@ use tonic::transport::Channel;
 #[derive(Clone, Debug)]
 pub struct GrancClient<T> {
     state: T,
+}
+
+impl<T> GrancClient<T> {
+    pub(crate) fn new(state: T) -> Self {
+        Self { state }
+    }
 }
 
 /// State: Connected to server, Schema from Server Reflection.
@@ -63,69 +72,36 @@ pub struct OnlineWithoutReflection<S = Channel> {
     pool: DescriptorPool,
 }
 
+impl<S> OnlineWithoutReflection<S> {
+    pub(crate) fn new(grpc_client: GrpcClient<S>, pool: DescriptorPool) -> Self {
+        Self { pool, grpc_client }
+    }
+}
+
 /// State: Disconnected, Schema from local FileDescriptor.
 #[derive(Debug, Clone)]
 pub struct Offline {
     pool: DescriptorPool,
 }
 
-/// A request object encapsulating all necessary information to perform a dynamic gRPC call.
-#[derive(Debug, Clone)]
-pub struct DynamicRequest {
-    /// The JSON body of the request.
-    /// - For Unary/ServerStreaming: An Object `{}`.
-    /// - For ClientStreaming/Bidirectional: An Array of Objects `[{}]`.
-    pub body: serde_json::Value,
-    /// Custom gRPC metadata (headers) to attach to the request.
-    pub headers: Vec<(String, String)>,
-    /// The fully qualified name of the service (e.g., `my.package.Service`).
-    pub service: String,
-    /// The name of the method to call (e.g., `SayHello`).
-    pub method: String,
-}
-
-/// The result of a dynamic gRPC call.
-#[derive(Debug, Clone)]
-pub enum DynamicResponse {
-    /// A single response message (for Unary and Client Streaming calls).
-    Unary(Result<serde_json::Value, tonic::Status>),
-    /// A stream of response messages (for Server Streaming and Bidirectional calls).
-    Streaming(Result<Vec<Result<serde_json::Value, tonic::Status>>, tonic::Status>),
-}
-
-/// A generic wrapper for different types of Protobuf descriptors.
-///
-/// This enum allows the client to return a single type when resolving symbols,
-/// regardless of whether the symbol points to a Service, a Message, or an Enum.
-#[derive(Debug, Clone)]
-pub enum Descriptor {
-    MessageDescriptor(MessageDescriptor),
-    ServiceDescriptor(ServiceDescriptor),
-    EnumDescriptor(EnumDescriptor),
-}
-
-impl Descriptor {
-    /// Returns the inner [`MessageDescriptor`] if this variant is `MessageDescriptor`.
-    pub fn message_descriptor(&self) -> Option<&MessageDescriptor> {
-        match self {
-            Descriptor::MessageDescriptor(d) => Some(d),
-            _ => None,
-        }
+impl Offline {
+    pub(crate) fn new(pool: DescriptorPool) -> Self {
+        Self { pool }
     }
+}
 
-    /// Returns the inner [`ServiceDescriptor`] if this variant is `ServiceDescriptor`.
-    pub fn service_descriptor(&self) -> Option<&ServiceDescriptor> {
-        match self {
-            Descriptor::ServiceDescriptor(d) => Some(d),
-            _ => None,
-        }
+pub trait OfflineReflectionState {
+    fn descriptor_pool(&self) -> &DescriptorPool;
+}
+
+impl OfflineReflectionState for Offline {
+    fn descriptor_pool(&self) -> &DescriptorPool {
+        &self.pool
     }
+}
 
-    /// Returns the inner [`EnumDescriptor`] if this variant is `EnumDescriptor`.
-    pub fn enum_descriptor(&self) -> Option<&EnumDescriptor> {
-        match self {
-            Descriptor::EnumDescriptor(d) => Some(d),
-            _ => None,
-        }
+impl<S> OfflineReflectionState for OnlineWithoutReflection<S> {
+    fn descriptor_pool(&self) -> &DescriptorPool {
+        &self.pool
     }
 }

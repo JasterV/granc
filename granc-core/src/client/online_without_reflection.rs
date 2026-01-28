@@ -2,14 +2,10 @@
 //!
 //! This module defines the `GrancClient` behavior when it is connected to a server
 //! but uses a local, in-memory `DescriptorPool` (Static schema) to resolve messages.
-use super::{Descriptor, DynamicRequest, DynamicResponse, GrancClient, OnlineWithoutReflection};
-use crate::{
-    BoxError,
-    grpc::client::{GrpcClient, GrpcRequestError},
-};
+use super::{DynamicRequest, DynamicResponse, GrancClient, OnlineWithoutReflection};
+use crate::{BoxError, client::OfflineReflectionState, grpc::client::GrpcRequestError};
 use futures_util::{Stream, StreamExt};
 use http_body::Body as HttpBody;
-use prost_reflect::DescriptorPool;
 use std::fmt::Debug;
 
 /// Errors that can occur during a dynamic call in OnlineWithoutReflection mode.
@@ -27,45 +23,10 @@ pub enum DynamicCallError {
 
 impl<S> GrancClient<OnlineWithoutReflection<S>>
 where
-    S: Clone,
-{
-    pub(crate) fn new(grpc_client: GrpcClient<S>, pool: DescriptorPool) -> Self {
-        Self {
-            state: OnlineWithoutReflection { grpc_client, pool },
-        }
-    }
-}
-
-impl<S> GrancClient<OnlineWithoutReflection<S>>
-where
     S: tonic::client::GrpcService<tonic::body::Body> + Clone,
     S::ResponseBody: HttpBody<Data = tonic::codegen::Bytes> + Send + 'static,
     <S::ResponseBody as HttpBody>::Error: Into<BoxError> + Send,
 {
-    /// Lists all services in the local descriptor pool.
-    pub fn list_services(&mut self) -> Vec<String> {
-        self.state
-            .pool
-            .services()
-            .map(|s| s.full_name().to_string())
-            .collect()
-    }
-
-    /// Looks up a symbol in the local descriptor pool.
-    pub fn get_descriptor_by_symbol(&mut self, symbol: &str) -> Option<Descriptor> {
-        let pool = &self.state.pool;
-        if let Some(descriptor) = pool.get_service_by_name(symbol) {
-            return Some(Descriptor::ServiceDescriptor(descriptor));
-        }
-        if let Some(descriptor) = pool.get_message_by_name(symbol) {
-            return Some(Descriptor::MessageDescriptor(descriptor));
-        }
-        if let Some(descriptor) = pool.get_enum_by_name(symbol) {
-            return Some(Descriptor::EnumDescriptor(descriptor));
-        }
-        None
-    }
-
     /// Executes a dynamic gRPC request using the local descriptor pool.
     pub async fn dynamic(
         &mut self,
@@ -73,7 +34,7 @@ where
     ) -> Result<DynamicResponse, DynamicCallError> {
         let method = self
             .state
-            .pool
+            .descriptor_pool()
             .get_service_by_name(&request.service)
             .ok_or_else(|| DynamicCallError::ServiceNotFound(request.service.clone()))?
             .methods()

@@ -4,7 +4,8 @@
 //! `DescriptorPool` but is **not connected** to any gRPC server.
 //!
 //! In this state, the client is strictly limited to introspection tasks.
-use super::{Descriptor, GrancClient, Offline};
+use super::{GrancClient, Offline};
+use crate::client::{OfflineReflectionState, types::Descriptor};
 use prost_reflect::{DescriptorError, DescriptorPool};
 
 impl GrancClient<Offline> {
@@ -28,7 +29,12 @@ impl GrancClient<Offline> {
             state: Offline { pool },
         })
     }
+}
 
+impl<T> GrancClient<T>
+where
+    T: OfflineReflectionState,
+{
     /// Lists all services defined in the local `DescriptorPool`.
     ///
     /// # Returns
@@ -36,7 +42,7 @@ impl GrancClient<Offline> {
     /// A list of fully qualified service names (e.g. `helloworld.Greeter`).
     pub fn list_services(&self) -> Vec<String> {
         self.state
-            .pool
+            .descriptor_pool()
             .services()
             .map(|s| s.full_name().to_string())
             .collect()
@@ -53,7 +59,7 @@ impl GrancClient<Offline> {
     /// * `Some(Descriptor)` - The resolved descriptor if found.
     /// * `None` - If the symbol does not exist in the pool.
     pub fn get_descriptor_by_symbol(&self, symbol: &str) -> Option<Descriptor> {
-        let pool = &self.state.pool;
+        let pool = self.state.descriptor_pool();
 
         if let Some(descriptor) = pool.get_service_by_name(symbol) {
             return Some(Descriptor::ServiceDescriptor(descriptor));
