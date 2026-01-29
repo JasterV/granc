@@ -1,0 +1,15 @@
+[package]
+name = "granc-tui"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+granc_core = { path = "../granc-core" }
+teatui = { version = "0.4.0", features = ["tokio"] }
+ratatui = "0.30"
+crossterm = "0.29"
+serde_json = "1.0"
+thiserror = "2.0"
+anyhow = "1.0"
+colored = "3.1"
+tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
