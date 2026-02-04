@@ -57,6 +57,19 @@ pub enum Commands {
         /// Fully qualified name (e.g. my.package.Service)
         symbol: String,
     },
+
+    /// Generate Markdown documentation for a service.
+    Docs {
+        #[command(flatten)]
+        source: SourceSelection,
+
+        /// Fully qualified service name (e.g. my.package.MyService)
+        symbol: String,
+
+        /// Output directory for the generated markdown files
+        #[arg(long, short = 'o')]
+        output: PathBuf,
+    },
 }
 
 #[derive(Args, Debug)]

@@ -8,6 +8,7 @@
 //! 3. **Execution**: Delegates request processing to `GrancClient`.
 //! 4. **Presentation**: Formats and prints data.
 mod cli;
+mod docs;
 mod formatter;
 
 use clap::Parser;
@@ -43,6 +44,27 @@ async fn main() {
         Commands::Describe { symbol, source } => {
             let descriptor = describe(symbol, source.value()).await;
             println!("{}", FormattedString::from(descriptor))
+        }
+
+        // Add the Docs handler
+        Commands::Docs {
+            symbol,
+            source,
+            output,
+        } => {
+            let descriptor = describe(symbol, source.value()).await;
+
+            if let Descriptor::ServiceDescriptor(service) = descriptor {
+                let mut generator = docs::DocsGenerator::new(output);
+                if let Err(e) = generator.generate(service) {
+                    eprintln!("Error generating docs: {}", e);
+                    process::exit(1);
+                }
+                println!("Documentation generated successfully.");
+            } else {
+                eprintln!("Error: The symbol passed is not a Service.");
+                process::exit(1);
+            }
         }
     }
 }
