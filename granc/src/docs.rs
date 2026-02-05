@@ -1,10 +1,17 @@
 // granc/src/docs.rs
 use crate::formatter::FormattedString;
-use colored::control::set_override;
+use granc_core::client::Descriptor;
 use granc_core::prost_reflect::{EnumDescriptor, Kind, MessageDescriptor, ServiceDescriptor};
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::PathBuf;
+
+#[derive(Default)]
+struct Package {
+    services: Vec<ServiceDescriptor>,
+    messages: Vec<MessageDescriptor>,
+    enums: Vec<EnumDescriptor>,
+}
 
 pub struct DocsGenerator {
     output_dir: PathBuf,
@@ -22,11 +29,13 @@ impl DocsGenerator {
     /// Entry point for documentation generation.
     pub fn generate(&mut self, service: &ServiceDescriptor) -> std::io::Result<()> {
         // Force colored output OFF so we get plain text for the markdown files
-        set_override(false);
+        colored::control::set_override(false);
 
         if !self.output_dir.exists() {
             fs::create_dir_all(&self.output_dir)?;
         }
+
+        let _packages = collect_descriptors(service.clone());
 
         // 1. Generate the Service page and recursively all dependencies
         self.generate_service(service)?;
@@ -35,7 +44,8 @@ impl DocsGenerator {
         self.generate_index(service)?;
 
         // Restore colored output for the CLI
-        set_override(true);
+        colored::control::unset_override();
+
         Ok(())
     }
 
@@ -191,4 +201,51 @@ impl DocsGenerator {
             eprintln!("Failed to generate docs for enum: {}", e);
         }
     }
+}
+
+fn collect_descriptors(entrypoint: ServiceDescriptor) -> HashMap<String, Descriptor> {
+    let descriptors: HashMap<_, _> = [].into();
+
+    let mut descriptors = collect_service_dependencies(descriptors, &entrypoint);
+
+    descriptors.insert(
+        entrypoint.full_name().to_string(),
+        Descriptor::ServiceDescriptor(entrypoint),
+    );
+
+    descriptors
+}
+
+fn collect_service_dependencies(
+    descriptors: HashMap<String, Descriptor>,
+    service: &ServiceDescriptor,
+) -> HashMap<String, Descriptor> {
+    service
+        .methods()
+        .flat_map(|m| [m.input(), m.output()])
+        .fold(descriptors, |acc, d| {
+            let mut descriptors = collect_message_dependencies(acc, &d);
+            descriptors.insert(d.full_name().to_string(), Descriptor::MessageDescriptor(d));
+            descriptors
+        })
+}
+
+fn collect_message_dependencies(
+    descriptors: HashMap<String, Descriptor>,
+    message: &MessageDescriptor,
+) -> HashMap<String, Descriptor> {
+    message
+        .fields()
+        .fold(descriptors, |mut acc, field| match field.kind() {
+            Kind::Message(m) => {
+                let mut descriptors = collect_message_dependencies(acc, &m);
+                descriptors.insert(m.full_name().to_string(), Descriptor::MessageDescriptor(m));
+                descriptors
+            }
+            Kind::Enum(e) => {
+                acc.insert(field.full_name().to_string(), Descriptor::EnumDescriptor(e));
+                acc
+            }
+            _ => acc,
+        })
 }
