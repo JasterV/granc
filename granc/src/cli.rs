@@ -59,7 +59,7 @@ pub enum Commands {
     },
 
     /// Generate Markdown documentation for a service.
-    Docs {
+    Doc {
         #[command(flatten)]
         source: SourceSelection,
 

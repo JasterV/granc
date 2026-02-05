@@ -17,6 +17,8 @@ use formatter::{FormattedString, GenericError};
 use granc_core::client::{Descriptor, DynamicRequest, DynamicResponse, GrancClient};
 use std::process;
 
+use crate::docs::DocsGenerator;
+
 #[tokio::main]
 async fn main() {
     let args = Cli::parse();
@@ -46,25 +48,26 @@ async fn main() {
             println!("{}", FormattedString::from(descriptor))
         }
 
-        // Add the Docs handler
-        Commands::Docs {
+        // Add the Doc handler
+        Commands::Doc {
             symbol,
             source,
             output,
         } => {
-            let descriptor = describe(symbol, source.value()).await;
+            let descriptor = describe(symbol.clone(), source.value()).await;
+            let service_descriptor = descriptor
+                .service_descriptor()
+                .ok_or_else(|| GenericError("The symbol must be a Service", symbol))
+                .unwrap_or_exit();
 
-            if let Descriptor::ServiceDescriptor(service) = descriptor {
-                let mut generator = docs::DocsGenerator::new(output);
-                if let Err(e) = generator.generate(service) {
-                    eprintln!("Error generating docs: {}", e);
-                    process::exit(1);
-                }
-                println!("Documentation generated successfully.");
-            } else {
-                eprintln!("Error: The symbol passed is not a Service.");
-                process::exit(1);
-            }
+            let mut generator = DocsGenerator::new(output);
+
+            generator
+                .generate(service_descriptor)
+                .map_err(|e| GenericError("Failed to generate docs", e))
+                .unwrap_or_exit();
+
+            println!("Documentation generated successfully.");
         }
     }
 }

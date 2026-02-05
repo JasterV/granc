@@ -20,7 +20,7 @@ impl DocsGenerator {
     }
 
     /// Entry point for documentation generation.
-    pub fn generate(&mut self, service: ServiceDescriptor) -> std::io::Result<()> {
+    pub fn generate(&mut self, service: &ServiceDescriptor) -> std::io::Result<()> {
         // Force colored output OFF so we get plain text for the markdown files
         set_override(false);
 
@@ -29,10 +29,10 @@ impl DocsGenerator {
         }
 
         // 1. Generate the Service page and recursively all dependencies
-        self.generate_service(&service)?;
+        self.generate_service(service)?;
 
         // 2. Generate the Index (Table of Contents)
-        self.generate_index(&service)?;
+        self.generate_index(service)?;
 
         // Restore colored output for the CLI
         set_override(true);
