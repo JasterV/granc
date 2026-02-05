@@ -8,7 +8,7 @@
 //! 3. **Execution**: Delegates request processing to `GrancClient`.
 //! 4. **Presentation**: Formats and prints data.
 mod cli;
-mod docs;
+mod docgen;
 mod formatter;
 
 use clap::Parser;
@@ -16,8 +16,6 @@ use cli::{Cli, Commands, Source};
 use formatter::{FormattedString, GenericError};
 use granc_core::client::{Descriptor, DynamicRequest, DynamicResponse, GrancClient};
 use std::process;
-
-use crate::docs::DocsGenerator;
 
 #[tokio::main]
 async fn main() {
@@ -55,15 +53,14 @@ async fn main() {
             output,
         } => {
             let descriptor = describe(symbol.clone(), source.value()).await;
+
             let service_descriptor = descriptor
                 .service_descriptor()
+                .cloned()
                 .ok_or_else(|| GenericError("The symbol must be a Service", symbol))
                 .unwrap_or_exit();
 
-            let mut generator = DocsGenerator::new(output);
-
-            generator
-                .generate(service_descriptor)
+            docgen::markdown::generate(output, service_descriptor)
                 .map_err(|e| GenericError("Failed to generate docs", e))
                 .unwrap_or_exit();
 
