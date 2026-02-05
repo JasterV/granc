@@ -89,16 +89,8 @@ impl DocsGenerator {
             let input = method.input();
             let output = method.output();
 
-            out.push_str(&format!(
-                "- Request: [{}]({}.md)\n",
-                input.full_name(),
-                input.full_name()
-            ));
-            out.push_str(&format!(
-                "- Response: [{}]({}.md)\n",
-                output.full_name(),
-                output.full_name()
-            ));
+            out.push_str(&format!("- Request: [{0}]({0}.md)\n", input.full_name()));
+            out.push_str(&format!("- Response: [{0}]({0}.md)\n", output.full_name()));
             out.push('\n');
 
             // Queue recursion for dependencies
@@ -109,18 +101,6 @@ impl DocsGenerator {
         fs::write(path, out)?;
         println!("Generated: {}", filename);
         Ok(())
-    }
-
-    fn queue_message(&mut self, message: MessageDescriptor) {
-        let name = message.full_name().to_string();
-        if self.visited.contains(&name) {
-            return;
-        }
-        self.visited.insert(name);
-
-        if let Err(e) = self.generate_message(message) {
-            eprintln!("Failed to generate docs for message: {}", e);
-        }
     }
 
     fn generate_message(&mut self, message: MessageDescriptor) -> std::io::Result<()> {
@@ -137,6 +117,7 @@ impl DocsGenerator {
 
         // Dependencies
         out.push_str("## Dependencies\n\n");
+
         let mut has_deps = false;
 
         for field in message.fields() {
@@ -144,9 +125,8 @@ impl DocsGenerator {
                 Kind::Message(m) => {
                     has_deps = true;
                     out.push_str(&format!(
-                        "- Field `{}`: [{}]({}.md)\n",
+                        "- Field `{0}`: [{1}]({1}.md)\n",
                         field.name(),
-                        m.full_name(),
                         m.full_name()
                     ));
                     self.queue_message(m);
@@ -174,18 +154,6 @@ impl DocsGenerator {
         Ok(())
     }
 
-    fn queue_enum(&mut self, enum_desc: EnumDescriptor) {
-        let name = enum_desc.full_name().to_string();
-        if self.visited.contains(&name) {
-            return;
-        }
-        self.visited.insert(name);
-
-        if let Err(e) = self.generate_enum(enum_desc) {
-            eprintln!("Failed to generate docs for enum: {}", e);
-        }
-    }
-
     fn generate_enum(&mut self, enum_desc: EnumDescriptor) -> std::io::Result<()> {
         let filename = format!("{}.md", enum_desc.full_name());
         let path = self.output_dir.join(&filename);
@@ -200,5 +168,27 @@ impl DocsGenerator {
         fs::write(path, out)?;
         println!("Generated: {}", filename);
         Ok(())
+    }
+
+    fn queue_message(&mut self, message: MessageDescriptor) {
+        let name = message.full_name().to_string();
+        if !self.visited.insert(name) {
+            return;
+        }
+
+        if let Err(e) = self.generate_message(message) {
+            eprintln!("Failed to generate docs for message: {}", e);
+        }
+    }
+
+    fn queue_enum(&mut self, enum_desc: EnumDescriptor) {
+        let name = enum_desc.full_name().to_string();
+        if !self.visited.insert(name) {
+            return;
+        }
+
+        if let Err(e) = self.generate_enum(enum_desc) {
+            eprintln!("Failed to generate docs for enum: {}", e);
+        }
     }
 }
