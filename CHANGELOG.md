@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## `granc_core` - [0.6.1](https://github.com/JasterV/granc/compare/granc_core-v0.6.0...granc_core-v0.6.1) - 2026-02-06
+
+- Added `name`, `full_name`, and `package_name` methods to `Descriptor` to simplify access to descriptor metadata.
+
 ## `granc` - [0.7.0](https://github.com/JasterV/granc/compare/granc-v0.6.0...granc-v0.7.0) - 2026-01-28
 
 - *(deps)* bump clap from 4.5.54 to 4.5.55 ([#36](https://github.com/JasterV/granc/pull/36))
