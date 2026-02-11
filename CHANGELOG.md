@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## `granc` - [0.7.3](https://github.com/JasterV/granc/compare/granc-v0.7.2...granc-v0.7.3) - 2026-02-11
 
+### Fixed
+- support for cargo binstall
+
+## `granc` - [0.7.3](https://github.com/JasterV/granc/compare/granc-v0.7.2...granc-v0.7.3) - 2026-02-11
+
 - [fix] Support for cargo binstall
 
 ## `granc` - [0.7.2](https://github.com/JasterV/granc/compare/granc-v0.7.1...granc-v0.7.2) - 2026-02-11
