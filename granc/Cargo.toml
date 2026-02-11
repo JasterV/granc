@@ -11,11 +11,10 @@ publish = true
 readme = "../README.md"
 repository = { workspace = true }
 rust-version = { workspace = true }
-version = "0.7.2"
+version = "0.7.3"
 
 [package.metadata.binstall]
 pkg-url = "{ repo }/releases/download/{ name }-v{ version }/{ name }-{ target }.{ archive-format }"
-bin-dir = "{ name }-{ target }/{ bin }"
 pkg-fmt = "tgz"
 
 [package.metadata.binstall.overrides.x86_64-pc-windows-msvc]
