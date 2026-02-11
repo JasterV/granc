@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## `granc` - [0.7.2](https://github.com/JasterV/granc/compare/granc-v0.7.1...granc-v0.7.2) - 2026-02-06
+
+- [chore] Add support for cargo binstall
+
 ## `granc` - [0.7.1](https://github.com/JasterV/granc/compare/granc-v0.7.0...granc-v0.7.1) - 2026-02-06
 
 - [feat] Add a new command to generate markdown documentation for gRPC services ([#46](https://github.com/JasterV/granc/pull/46))
