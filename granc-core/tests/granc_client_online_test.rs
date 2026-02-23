@@ -1,5 +1,8 @@
 use echo_service_impl::EchoServiceImpl;
-use granc_core::client::{DynamicRequest, DynamicResponse, GrancClient, Online, online};
+use futures_util::StreamExt;
+use granc_core::client::{
+    DynamicRequest, DynamicResponse, DynamicStreamResponse, GrancClient, Online, online,
+};
 use granc_core::reflection::client::ReflectionResolveError;
 use granc_test_support::echo_service::{EchoServiceServer, FILE_DESCRIPTOR_SET};
 use tonic::Code;
@@ -174,4 +177,49 @@ async fn test_reflection_schema_mismatch() {
         result,
         Ok(DynamicResponse::Unary(Err(status))) if status.code() == Code::Internal
     ));
+}
+
+#[tokio::test]
+async fn test_reflection_dynamic_stream_unary() {
+    let mut client = setup_client().await;
+
+    let req = DynamicRequest {
+        service: "echo.EchoService".to_string(),
+        method: "UnaryEcho".to_string(),
+        body: serde_json::json!({ "message": "reflection stream" }),
+        headers: vec![],
+    };
+
+    let res = client.dynamic_stream(req).await.unwrap();
+    assert!(
+        matches!(res, DynamicStreamResponse::Single(Ok(val)) if val["message"] == "reflection stream")
+    );
+}
+
+#[tokio::test]
+async fn test_reflection_dynamic_stream_server_streaming() {
+    let mut client = setup_client().await;
+
+    let req = DynamicRequest {
+        service: "echo.EchoService".to_string(),
+        method: "ServerStreamingEcho".to_string(),
+        body: serde_json::json!({ "message": "stream" }),
+        headers: vec![],
+    };
+
+    let res = client.dynamic_stream(req).await.unwrap();
+
+    match res {
+        DynamicStreamResponse::Streaming(mut stream) => {
+            let mut messages = Vec::new();
+            while let Some(item) = stream.next().await {
+                messages.push(item.unwrap());
+            }
+            assert_eq!(messages.len(), 3);
+            assert_eq!(messages[0]["message"], "stream - seq 0");
+            assert_eq!(messages[1]["message"], "stream - seq 1");
+            assert_eq!(messages[2]["message"], "stream - seq 2");
+        }
+        _ => panic!("Expected Streaming response"),
+    }
 }

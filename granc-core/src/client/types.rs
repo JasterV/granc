@@ -1,3 +1,4 @@
+use futures_util::stream::BoxStream;
 use prost_reflect::{EnumDescriptor, MessageDescriptor, ServiceDescriptor};
 use std::fmt::Debug;
 
@@ -23,6 +24,18 @@ pub enum DynamicResponse {
     Unary(Result<serde_json::Value, tonic::Status>),
     /// A stream of response messages (for Server Streaming and Bidirectional calls).
     Streaming(Result<Vec<Result<serde_json::Value, tonic::Status>>, tonic::Status>),
+}
+
+/// The result of a dynamic gRPC call that preserves streaming semantics.
+///
+/// Unlike [`DynamicResponse`], which collects all streaming messages into a `Vec`,
+/// this type returns a [`BoxStream`] for streaming RPCs, allowing the caller to
+/// consume messages incrementally as they arrive.
+pub enum DynamicStreamResponse {
+    /// A single response message (for Unary and Client Streaming calls).
+    Single(Result<serde_json::Value, tonic::Status>),
+    /// A stream of response messages (for Server Streaming and Bidirectional calls).
+    Streaming(BoxStream<'static, Result<serde_json::Value, tonic::Status>>),
 }
 
 /// A generic wrapper for different types of Protobuf descriptors.

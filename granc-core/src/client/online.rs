@@ -3,7 +3,8 @@
 //! This module defines the `GrancClient` behavior when it is connected to a server
 //! and using Server Reflection for schema resolution.
 use super::{
-    Descriptor, DynamicRequest, DynamicResponse, GrancClient, Online, OnlineWithoutReflection,
+    Descriptor, DynamicRequest, DynamicResponse, DynamicStreamResponse, GrancClient, Online,
+    OnlineWithoutReflection,
 };
 use crate::{
     BoxError,
@@ -220,5 +221,32 @@ where
         ));
 
         Ok(client.dynamic(request).await?)
+    }
+
+    /// Executes a dynamic gRPC request using Server Reflection, preserving streaming semantics.
+    ///
+    /// Unlike [`dynamic()`](Self::dynamic), which collects all streaming responses into a `Vec`,
+    /// this method returns a [`BoxStream`](futures_util::stream::BoxStream) for streaming RPCs,
+    /// allowing the caller to consume messages incrementally as they arrive.
+    ///
+    /// For unary and client-streaming calls, the behavior is identical to `dynamic()`.
+    pub async fn dynamic_stream(
+        &mut self,
+        request: DynamicRequest,
+    ) -> Result<DynamicStreamResponse, DynamicCallError> {
+        let fd_set = self
+            .state
+            .reflection_client
+            .file_descriptor_set_by_symbol(&request.service)
+            .await?;
+
+        let pool = DescriptorPool::from_file_descriptor_set(fd_set)?;
+
+        let mut client = GrancClient::new(OnlineWithoutReflection::new(
+            self.state.grpc_client.clone(),
+            pool,
+        ));
+
+        Ok(client.dynamic_stream(request).await?)
     }
 }

@@ -2,7 +2,7 @@
 //!
 //! This module defines the `GrancClient` behavior when it is connected to a server
 //! but uses a local, in-memory `DescriptorPool` (Static schema) to resolve messages.
-use super::{DynamicRequest, DynamicResponse, GrancClient, OnlineWithoutReflection};
+use super::{DynamicRequest, DynamicResponse, DynamicStreamResponse, GrancClient, OnlineWithoutReflection};
 use crate::{BoxError, client::OfflineReflectionState, grpc::client::GrpcRequestError};
 use futures_util::{Stream, StreamExt};
 use http_body::Body as HttpBody;
@@ -100,6 +100,70 @@ where
                 {
                     Ok(stream) => Ok(DynamicResponse::Streaming(Ok(stream.collect().await))),
                     Err(status) => Ok(DynamicResponse::Streaming(Err(status))),
+                }
+            }
+        }
+    }
+
+    /// Executes a dynamic gRPC request, preserving streaming semantics.
+    ///
+    /// Unlike [`dynamic()`](Self::dynamic), which collects all streaming responses into a `Vec`,
+    /// this method returns a [`BoxStream`](futures_util::stream::BoxStream) for streaming RPCs,
+    /// allowing the caller to consume messages incrementally as they arrive.
+    ///
+    /// For unary and client-streaming calls, the behavior is identical to `dynamic()`.
+    pub async fn dynamic_stream(
+        &mut self,
+        request: DynamicRequest,
+    ) -> Result<DynamicStreamResponse, DynamicCallError> {
+        let method = self
+            .state
+            .descriptor_pool()
+            .get_service_by_name(&request.service)
+            .ok_or_else(|| DynamicCallError::ServiceNotFound(request.service.clone()))?
+            .methods()
+            .find(|m| m.name() == request.method)
+            .ok_or_else(|| DynamicCallError::MethodNotFound(request.method.clone()))?;
+
+        match (method.is_client_streaming(), method.is_server_streaming()) {
+            (false, false) => {
+                let result = self
+                    .state
+                    .grpc_client
+                    .unary(method, request.body, request.headers)
+                    .await?;
+                Ok(DynamicStreamResponse::Single(result))
+            }
+            (false, true) => match self
+                .state
+                .grpc_client
+                .server_streaming(method, request.body, request.headers)
+                .await?
+            {
+                Ok(stream) => Ok(DynamicStreamResponse::Streaming(stream.boxed())),
+                Err(status) => Ok(DynamicStreamResponse::Single(Err(status))),
+            },
+            (true, false) => {
+                let input_stream =
+                    json_array_to_stream(request.body).map_err(DynamicCallError::InvalidInput)?;
+                let result = self
+                    .state
+                    .grpc_client
+                    .client_streaming(method, input_stream, request.headers)
+                    .await?;
+                Ok(DynamicStreamResponse::Single(result))
+            }
+            (true, true) => {
+                let input_stream =
+                    json_array_to_stream(request.body).map_err(DynamicCallError::InvalidInput)?;
+                match self
+                    .state
+                    .grpc_client
+                    .bidirectional_streaming(method, input_stream, request.headers)
+                    .await?
+                {
+                    Ok(stream) => Ok(DynamicStreamResponse::Streaming(stream.boxed())),
+                    Err(status) => Ok(DynamicStreamResponse::Single(Err(status))),
                 }
             }
         }

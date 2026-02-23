@@ -1,6 +1,7 @@
 use echo_service_impl::EchoServiceImpl;
+use futures_util::StreamExt;
 use granc_core::client::{
-    DynamicRequest, DynamicResponse, GrancClient, OnlineWithoutReflection,
+    DynamicRequest, DynamicResponse, DynamicStreamResponse, GrancClient, OnlineWithoutReflection,
     online_without_reflection,
 };
 use granc_test_support::echo_service::{EchoServiceServer, FILE_DESCRIPTOR_SET};
@@ -191,4 +192,81 @@ async fn test_error_schema_mismatch() {
             if status.code() == Code::Internal
             && status.message().contains("JSON structure does not match Protobuf schema")
     ));
+}
+
+#[tokio::test]
+async fn test_dynamic_stream_unary_returns_single() {
+    let mut client = setup_client();
+
+    let req = DynamicRequest {
+        service: "echo.EchoService".to_string(),
+        method: "UnaryEcho".to_string(),
+        body: serde_json::json!({ "message": "hello" }),
+        headers: vec![],
+    };
+
+    let res = client.dynamic_stream(req).await.unwrap();
+
+    assert!(matches!(
+        res,
+        DynamicStreamResponse::Single(Ok(val)) if val["message"] == "hello"
+    ));
+}
+
+#[tokio::test]
+async fn test_dynamic_stream_server_streaming_returns_stream() {
+    let mut client = setup_client();
+
+    let req = DynamicRequest {
+        service: "echo.EchoService".to_string(),
+        method: "ServerStreamingEcho".to_string(),
+        body: serde_json::json!({ "message": "stream" }),
+        headers: vec![],
+    };
+
+    let res = client.dynamic_stream(req).await.unwrap();
+
+    match res {
+        DynamicStreamResponse::Streaming(mut stream) => {
+            let mut messages = Vec::new();
+            while let Some(item) = stream.next().await {
+                messages.push(item.unwrap());
+            }
+            assert_eq!(messages.len(), 3);
+            assert_eq!(messages[0]["message"], "stream - seq 0");
+            assert_eq!(messages[1]["message"], "stream - seq 1");
+            assert_eq!(messages[2]["message"], "stream - seq 2");
+        }
+        _ => panic!("Expected Streaming response"),
+    }
+}
+
+#[tokio::test]
+async fn test_dynamic_stream_bidirectional_returns_stream() {
+    let mut client = setup_client();
+
+    let req = DynamicRequest {
+        service: "echo.EchoService".to_string(),
+        method: "BidirectionalEcho".to_string(),
+        body: serde_json::json!([
+            { "message": "Ping" },
+            { "message": "Pong" }
+        ]),
+        headers: vec![],
+    };
+
+    let res = client.dynamic_stream(req).await.unwrap();
+
+    match res {
+        DynamicStreamResponse::Streaming(mut stream) => {
+            let mut messages = Vec::new();
+            while let Some(item) = stream.next().await {
+                messages.push(item.unwrap());
+            }
+            assert_eq!(messages.len(), 2);
+            assert_eq!(messages[0]["message"], "echo: Ping");
+            assert_eq!(messages[1]["message"], "echo: Pong");
+        }
+        _ => panic!("Expected Streaming response"),
+    }
 }

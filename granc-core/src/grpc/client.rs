@@ -105,7 +105,7 @@ where
         payload: serde_json::Value,
         headers: Vec<(String, String)>,
     ) -> Result<
-        Result<impl Stream<Item = Result<serde_json::Value, tonic::Status>>, tonic::Status>,
+        Result<tonic::Streaming<serde_json::Value>, tonic::Status>,
         GrpcRequestError,
     > {
         self.client
@@ -164,7 +164,7 @@ where
         payload_stream: impl Stream<Item = serde_json::Value> + Send + 'static,
         headers: Vec<(String, String)>,
     ) -> Result<
-        Result<impl Stream<Item = Result<serde_json::Value, tonic::Status>>, tonic::Status>,
+        Result<tonic::Streaming<serde_json::Value>, tonic::Status>,
         GrpcRequestError,
     > {
         self.client
