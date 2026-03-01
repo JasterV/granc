@@ -1,4 +1,5 @@
 use echo_service_impl::EchoServiceImpl;
+use futures_util::StreamExt;
 use granc_core::client::{
     DynamicRequest, DynamicResponse, GrancClient, OnlineWithoutReflection,
     online_without_reflection,
@@ -50,7 +51,9 @@ async fn test_dynamic_server_streaming_success() {
     let res = client.dynamic(req).await.unwrap();
 
     match res {
-        DynamicResponse::Streaming(Ok(stream)) => {
+        DynamicResponse::Streaming(stream) => {
+            let stream: Vec<_> = stream.collect().await;
+
             assert_eq!(stream.len(), 3);
             assert_eq!(stream[0].as_ref().unwrap()["message"], "stream - seq 0");
             assert_eq!(stream[1].as_ref().unwrap()["message"], "stream - seq 1");
@@ -101,7 +104,9 @@ async fn test_dynamic_bidirectional_streaming_success() {
     let res = client.dynamic(req).await.unwrap();
 
     match res {
-        DynamicResponse::Streaming(Ok(stream)) => {
+        DynamicResponse::Streaming(stream) => {
+            let stream: Vec<_> = stream.collect().await;
+
             assert_eq!(stream.len(), 2);
             assert_eq!(stream[0].as_ref().unwrap()["message"], "echo: Ping");
             assert_eq!(stream[1].as_ref().unwrap()["message"], "echo: Pong");
