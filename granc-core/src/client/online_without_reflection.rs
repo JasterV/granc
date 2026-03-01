@@ -4,7 +4,7 @@
 //! but uses a local, in-memory `DescriptorPool` (Static schema) to resolve messages.
 use super::{DynamicRequest, DynamicResponse, GrancClient, OnlineWithoutReflection};
 use crate::{BoxError, client::OfflineReflectionState, grpc::client::GrpcRequestError};
-use futures_util::{Stream, StreamExt};
+use futures_util::{Stream, StreamExt, stream};
 use http_body::Body as HttpBody;
 use std::fmt::Debug;
 
@@ -76,8 +76,10 @@ where
                 .server_streaming(method, request.body, request.headers)
                 .await?
             {
-                Ok(stream) => Ok(DynamicResponse::Streaming(Ok(stream.collect().await))),
-                Err(status) => Ok(DynamicResponse::Streaming(Err(status))),
+                Ok(stream) => Ok(DynamicResponse::Streaming(stream.boxed())),
+                Err(status) => Ok(DynamicResponse::Streaming(
+                    stream::once(async { Err(status) }).boxed(),
+                )),
             },
             (true, false) => {
                 let input_stream =
@@ -98,8 +100,10 @@ where
                     .bidirectional_streaming(method, input_stream, request.headers)
                     .await?
                 {
-                    Ok(stream) => Ok(DynamicResponse::Streaming(Ok(stream.collect().await))),
-                    Err(status) => Ok(DynamicResponse::Streaming(Err(status))),
+                    Ok(stream) => Ok(DynamicResponse::Streaming(stream.boxed())),
+                    Err(status) => Ok(DynamicResponse::Streaming(
+                        stream::once(async { Err(status) }).boxed(),
+                    )),
                 }
             }
         }
