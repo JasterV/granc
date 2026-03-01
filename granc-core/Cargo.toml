@@ -18,7 +18,7 @@ name = "granc_core"
 path = "src/lib.rs"
 
 [dependencies]
-futures-util = "0.3.31"
+futures-util = "0.3.32"
 http = "1.4.0"
 http-body = "1.0.1"
 prost = { workspace = true }
