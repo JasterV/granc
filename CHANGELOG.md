@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## `granc` - [0.7.4](https://github.com/JasterV/granc/compare/granc-v0.7.3...granc-v0.7.4) - 2026-03-07
+
+### Other
+- *(deps)* bump clap from 4.5.57 to 4.5.60 ([#58](https://github.com/JasterV/granc/pull/58))
+
+## `granc_core` - [0.7.0](https://github.com/JasterV/granc/compare/granc_core-v0.6.1...granc_core-v0.7.0) - 2026-03-07
+
+### Other
+- *(deps)* bump futures-util from 0.3.31 to 0.3.32 ([#55](https://github.com/JasterV/granc/pull/55))
+
 ## `granc` - [0.7.3](https://github.com/JasterV/granc/compare/granc-v0.7.2...granc-v0.7.3) - 2026-02-11
 
 - [fix] Support for cargo binstall
