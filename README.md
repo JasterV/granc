@@ -1,3 +1,11 @@
+# ⚠️ This repo has been migrated ⚠️
+
+I've decided to migrate all my projects to a free software alternative forge ([Codeberg](https://codeberg.org/)).
+
+You can find the most recent version of this repository [here](https://codeberg.org/JasterV/granc).
+
+I encourage any free software activist to follow the same steps, as it doesn't follow our view to make use of a propietary software to host our projects if we advocate for free software.
+
 # Granc 🦀
 
 [![granc on crates.io](https://img.shields.io/crates/v/granc)](https://crates.io/crates/granc)
