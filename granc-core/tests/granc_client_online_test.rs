@@ -2,6 +2,7 @@ use echo_service_impl::EchoServiceImpl;
 use granc_core::client::{DynamicRequest, DynamicResponse, GrancClient, Online, online};
 use granc_core::reflection::client::ReflectionResolveError;
 use granc_test_support::echo_service::{EchoServiceServer, FILE_DESCRIPTOR_SET};
+use tokio_stream::StreamExt;
 use tonic::Code;
 use tonic::service::Routes;
 
@@ -62,7 +63,9 @@ async fn test_reflection_server_streaming_success() {
     let res = client.dynamic(req).await.unwrap();
 
     match res {
-        DynamicResponse::Streaming(Ok(stream)) => {
+        DynamicResponse::Streaming(stream) => {
+            let stream: Vec<_> = stream.collect().await;
+
             assert_eq!(stream.len(), 3);
             assert_eq!(stream[0].as_ref().unwrap()["message"], "stream - seq 0");
             assert_eq!(stream[1].as_ref().unwrap()["message"], "stream - seq 1");
